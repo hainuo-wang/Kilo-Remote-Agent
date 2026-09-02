@@ -78,6 +78,7 @@ import { MCP } from "@/mcp"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { McpCatalog } from "@/mcp/catalog"
 import { InstanceRef } from "@/effect/instance-ref" // kilocode_change
+import { RemoteToolHost } from "@/kilocode/remote-worker/tool-host" // kilocode_change
 
 export function webSearchEnabled(
   providerID: ProviderV2.ID,
@@ -322,7 +323,7 @@ const layer = Layer.effect(
 
     const all: Interface["all"] = Effect.fn("ToolRegistry.all")(function* () {
       const s = yield* InstanceState.get(state)
-      return [...s.builtin.map(ToolNetwork.builtin), ...s.custom] as Tool.Def[] // kilocode_change
+      return RemoteToolHost.replace([...s.builtin.map(ToolNetwork.builtin), ...s.custom] as Tool.Def[]) // kilocode_change
     })
 
     const ids: Interface["ids"] = Effect.fn("ToolRegistry.ids")(function* () {
@@ -416,7 +417,7 @@ const layer = Layer.effect(
 
     const named: Interface["named"] = Effect.fn("ToolRegistry.named")(function* () {
       const s = yield* InstanceState.get(state)
-      return { task: s.task, read: s.read }
+      return RemoteToolHost.replaceNamed({ task: s.task, read: s.read }) // kilocode_change
     })
 
     return Service.of({ ids, all, named, tools })

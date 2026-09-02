@@ -24,7 +24,7 @@ export async function fetchSpeechToTextModels(
   if (dir) url.searchParams.set("directory", dir)
 
   try {
-    const res = await fetch(url, { signal, headers: { Authorization: `Basic ${auth}` } })
+    const res = await connection.getFetch()(url, { signal, headers: { Authorization: `Basic ${auth}` } })
     if (!res.ok) return fail(`Failed to fetch speech-to-text models (HTTP ${res.status})`)
 
     const models = parseSpeechToTextCatalog(await res.json())

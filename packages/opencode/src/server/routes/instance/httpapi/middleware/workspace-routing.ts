@@ -32,7 +32,13 @@ type RemoteTarget = Extract<Target, { type: "remote" }>
 type RequestPlan = Data.TaggedEnum<{
   InvalidWorkspace: {}
   MissingWorkspace: { readonly workspaceID: WorkspaceV2.ID }
-  Local: { readonly directory: string; readonly workspaceID?: WorkspaceV2.ID }
+  // kilocode_change start - the controller's virtual directory maps to this remote path
+  Local: {
+    readonly directory: string
+    readonly workspaceID?: WorkspaceV2.ID
+    readonly remoteDirectory?: string
+  }
+  // kilocode_change end
   Remote: {
     readonly request: HttpServerRequest.HttpServerRequest
     readonly workspace: Workspace.Info
@@ -48,6 +54,9 @@ export class WorkspaceRouteContext extends Context.Service<
   {
     readonly directory: string
     readonly workspaceID?: WorkspaceV2.ID
+    // kilocode_change start
+    readonly remoteDirectory?: string
+    // kilocode_change end
   }
 >()("@opencode/ExperimentalHttpApiWorkspaceRouteContext") {}
 
@@ -87,6 +96,15 @@ function selectedV2WorkspaceID(
 function defaultDirectory(request: HttpServerRequest.HttpServerRequest, url: URL): string {
   return url.searchParams.get("directory") || request.headers["x-kilo-directory"] || process.cwd()
 }
+
+// kilocode_change start - the remote controller rewrites the routing directory
+// to a local virtual directory and carries the Linux path separately.
+function remoteDirectory(request: HttpServerRequest.HttpServerRequest): string | undefined {
+  const value = request.headers["x-kilo-remote-directory"]
+  if (!value) return
+  return value
+}
+// kilocode_change end
 
 function shouldStayOnControlPlane(request: HttpServerRequest.HttpServerRequest, url: URL): boolean {
   return isLocalWorkspaceRoute(request.method, url.pathname) || url.pathname.startsWith("/console")
@@ -154,7 +172,14 @@ function planWorkspaceRequest(
   return Effect.gen(function* () {
     const target = yield* resolveTarget(workspace)
     if (target.type === "remote") return RequestPlan.Remote({ request, workspace, target, url })
-    return RequestPlan.Local({ directory: target.directory, workspaceID: workspace.id })
+    // kilocode_change start - preserve the remote workspace path when the
+    // selected workspace resolves to the local controller's virtual directory.
+    return RequestPlan.Local({
+      directory: target.directory,
+      workspaceID: workspace.id,
+      remoteDirectory: remoteDirectory(request),
+    })
+    // kilocode_change end
   })
 }
 
@@ -180,10 +205,15 @@ function planRequest(
     }
 
     // kilocode_change start - a fork targeting an explicit directory (e.g. a worktree) must not inherit the source session's directory
-    const forkDirectory = forkTargetDirectory(request.method, url, request.headers as Record<string, string | undefined>)
+    const forkDirectory = forkTargetDirectory(
+      request.method,
+      url,
+      request.headers as Record<string, string | undefined>,
+    )
     return RequestPlan.Local({
       directory: forkDirectory || session?.directory || defaultDirectory(request, url),
       workspaceID: envWorkspaceID ?? workspaceID,
+      remoteDirectory: remoteDirectory(request),
     })
     // kilocode_change end
   })
@@ -208,8 +238,19 @@ function routeWorkspace<E>(
       ),
     MissingWorkspace: ({ workspaceID }) => Effect.succeed(missingWorkspaceResponse(workspaceID)),
     Remote: ({ request, workspace, target, url }) => proxyRemote(client, request, workspace, target, url),
-    Local: ({ directory, workspaceID }) =>
-      effect.pipe(Effect.provideService(WorkspaceRouteContext, WorkspaceRouteContext.of({ directory, workspaceID }))),
+    // kilocode_change start
+    Local: ({ directory, workspaceID, remoteDirectory }) =>
+      effect.pipe(
+        Effect.provideService(
+          WorkspaceRouteContext,
+          WorkspaceRouteContext.of({
+            directory,
+            workspaceID,
+            remoteDirectory,
+          }),
+        ),
+      ),
+    // kilocode_change end
   })
 }
 

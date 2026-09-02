@@ -20,7 +20,7 @@ async function snapshot(connectionService: KiloConnectionService) {
   if (!cfg) throw new Error("CLI server is not connected")
 
   const auth = Buffer.from(`kilo:${cfg.password}`).toString("base64")
-  const res = await fetch(`${cfg.baseUrl}/kilocode/heap/snapshot`, {
+  const res = await connectionService.getFetch()(`${cfg.baseUrl}/kilocode/heap/snapshot`, {
     method: "POST",
     headers: {
       Authorization: `Basic ${auth}`,

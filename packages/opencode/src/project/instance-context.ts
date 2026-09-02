@@ -6,6 +6,10 @@ export interface InstanceContext {
   directory: string
   worktree: string
   project: Project.Info
+  // kilocode_change start - remote controller keeps a local virtual instance
+  // while tools execute against the workspace on the remote extension host.
+  remoteDirectory?: string
+  // kilocode_change end
 }
 
 export const context = LocalContext.create<InstanceContext>("instance")

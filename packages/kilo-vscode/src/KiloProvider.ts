@@ -2880,7 +2880,12 @@ export class KiloProvider implements vscode.WebviewViewProvider, TelemetryProper
       if (!dir) return
       const store = indexingConsentStore(this.extensionContext)
       const project = await store.project(dir)
-      const status = await this.syncIndexingConsent(project.root, store.enabled(project.id), config)
+      const status = await this.syncIndexingConsent(
+        project.root,
+        store.enabled(project.id),
+        config,
+        this.connectionService.getFetch?.() ?? fetch,
+      )
       if (request !== this.indexingStatusRequest) return
       const message = {
         type: "indexingStatusLoaded",
@@ -3760,7 +3765,12 @@ export class KiloProvider implements vscode.WebviewViewProvider, TelemetryProper
     const config = this.connectionService.getServerConfig()
     if (!config) return
     const request = ++this.indexingStatusRequest
-    const status = await this.syncIndexingConsent(project.root, enabled, config)
+    const status = await this.syncIndexingConsent(
+      project.root,
+      enabled,
+      config,
+      this.connectionService.getFetch?.() ?? fetch,
+    )
     if (request !== this.indexingStatusRequest || this.indexingProjectId !== project.id) return
     const message = { type: "indexingStatusLoaded", status, projectId: project.id }
     this.cachedIndexingStatusMessage = message
@@ -3771,9 +3781,10 @@ export class KiloProvider implements vscode.WebviewViewProvider, TelemetryProper
     dir: string,
     enabled: boolean,
     config: { baseUrl: string; password: string },
+    fetcher: typeof fetch,
   ): Promise<IndexingStatus> {
     const auth = Buffer.from(`kilo:${config.password}`).toString("base64")
-    const res = await fetch(`${config.baseUrl}/indexing/consent`, {
+    const res = await fetcher(`${config.baseUrl}/indexing/consent`, {
       method: "PUT",
       headers: {
         Authorization: `Basic ${auth}`,

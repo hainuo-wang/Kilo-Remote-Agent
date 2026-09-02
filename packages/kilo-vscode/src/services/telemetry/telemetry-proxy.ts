@@ -11,6 +11,7 @@ export class TelemetryProxy {
 
   private url: string | undefined
   private password: string | undefined
+  private fetcher: typeof fetch = fetch
   private provider: TelemetryPropertiesProvider | undefined
 
   private constructor() {}
@@ -27,9 +28,10 @@ export class TelemetryProxy {
   /**
    * Configure the CLI server connection. Must be called before capture() will send events.
    */
-  configure(url: string, password: string) {
+  configure(url: string, password: string, fetcher: typeof fetch = fetch) {
     this.url = url
     this.password = password
+    this.fetcher = fetcher
   }
 
   setProvider(provider: TelemetryPropertiesProvider) {
@@ -51,7 +53,7 @@ export class TelemetryProxy {
     const payload = JSON.stringify(built)
     const auth = buildTelemetryAuthHeader(this.password)
 
-    fetch(`${this.url}/telemetry/capture`, {
+    this.fetcher(`${this.url}/telemetry/capture`, {
       method: "POST",
       headers: {
         Authorization: auth,
@@ -71,7 +73,7 @@ export class TelemetryProxy {
     if (!this.url || !this.password) return
 
     const auth = buildTelemetryAuthHeader(this.password)
-    fetch(`${this.url}/telemetry/setEnabled`, {
+    this.fetcher(`${this.url}/telemetry/setEnabled`, {
       method: "POST",
       headers: {
         Authorization: auth,

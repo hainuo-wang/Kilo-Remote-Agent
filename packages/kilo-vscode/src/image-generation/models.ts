@@ -24,7 +24,7 @@ export async function fetchImageModels(
   if (dir) url.searchParams.set("directory", dir)
 
   try {
-    const res = await fetch(url, {
+    const res = await connection.getFetch()(url, {
       signal,
       headers: { Authorization: `Basic ${auth}` },
     })

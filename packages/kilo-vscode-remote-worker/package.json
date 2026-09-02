@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "kilo-code-remote-worker",
+  "displayName": "Kilo Code Remote Worker",
+  "description": "Remote execution worker for the Kilo Code VS Code extension.",
+  "version": "7.5.9",
+  "publisher": "kilocode",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Kilo-Org/kilocode.git",
+    "directory": "packages/kilo-vscode-remote-worker"
+  },
+  "license": "MIT",
+  "private": true,
+  "engines": {
+    "vscode": "^1.105.1"
+  },
+  "api": "none",
+  "extensionKind": [
+    "workspace"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "Kilo Code Remote Worker",
+      "properties": {
+        "kilo-code.remoteWorker.cliPath": {
+          "type": "string",
+          "description": "Optional path to the Kilo CLI used by the remote worker.",
+          "scope": "machine"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.js",
+    "bundle": "node esbuild.js",
+    "check-types": "tsgo --noEmit",
+    "typecheck": "bun run check-types",
+    "package": "bun run build && bun script/package.ts --package"
+  },
+  "dependencies": {
+    "@kilocode/kilo-remote-protocol": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/vscode": "^1.105.1",
+    "esbuild": "^0.27.2",
+    "@typescript/native-preview": "catalog:",
+    "@vscode/vsce": "^3.7.1",
+    "@tsconfig/bun": "catalog:",
+    "typescript": "catalog:"
+  }
+}

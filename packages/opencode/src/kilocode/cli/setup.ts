@@ -14,6 +14,7 @@ import {
   KiloConsoleCommand,
   ProfileCommand,
   PtySmokeCommand,
+  RemoteWorkerCommand,
   RemoteCommand,
   RollCallCommand,
   WorktreeCommand,
@@ -52,6 +53,7 @@ export namespace KiloCli {
       .command(ConfigCLICommand)
       .command(WorktreeCommand)
     if (process.env.KILO_PTY_SMOKE === "1") cli.command(PtySmokeCommand)
+    cli.command(RemoteWorkerCommand)
     if (InstallationBuildKind !== "release") cli.command(DevSetupCommand).command(DevAliasCommand)
     // Safe self-reference: `cli` is a typed parameter and yargs `.command()` returns the same
     // instance, so the help command can resolve the fully-built root at handler time. This also
@@ -70,6 +72,7 @@ export namespace KiloCli {
   export async function bootstrap(opts: { [key: string]: unknown }): Promise<void> {
     info = opts.help === true || opts.version === true
     if (info) return
+    if (process.env.KILO_REMOTE_WORKER === "1" || process.argv.includes("remote-worker")) return
     narrow = workerTui(opts)
 
     const { KiloLog } = await import("@/kilocode/log")
@@ -134,6 +137,7 @@ export namespace KiloCli {
   // Runs from the `finally` block on every exit path.
   export async function shutdown(): Promise<void> {
     if (info) return
+    if (process.env.KILO_REMOTE_WORKER === "1" || process.argv.includes("remote-worker")) return
     const { Telemetry } = await import("@kilocode/kilo-telemetry")
     const code = typeof process.exitCode === "number" ? process.exitCode : undefined
     Telemetry.trackCliExit(code)

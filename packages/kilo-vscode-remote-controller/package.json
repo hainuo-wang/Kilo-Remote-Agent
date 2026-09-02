@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "kilo-code-remote-controller",
+  "displayName": "Kilo Code Remote Controller",
+  "description": "Local controller transport for the Kilo Code Remote Worker PoC.",
+  "version": "7.5.9",
+  "publisher": "kilocode",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Kilo-Org/kilocode.git",
+    "directory": "packages/kilo-vscode-remote-controller"
+  },
+  "license": "MIT",
+  "private": true,
+  "engines": {
+    "vscode": "^1.105.1"
+  },
+  "api": "none",
+  "extensionKind": [
+    "ui"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "Kilo Code Remote Controller",
+      "properties": {
+        "kilo-code.remoteController.cliPath": {
+          "type": "string",
+          "description": "Optional local path to the Kilo CLI used by the controller.",
+          "scope": "machine"
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "kilo-code.new.remote.runSmoke",
+        "title": "Kilo: Run Remote Worker Smoke Test"
+      },
+      {
+        "command": "kilo-code.new.remote.configureMioffice",
+        "title": "Kilo: Configure Local Mioffice API Key"
+      }
+    ]
+  },
+  "scripts": {
+    "build": "node esbuild.js",
+    "bundle": "node esbuild.js",
+    "prepare:cli": "bun script/package.ts",
+    "package": "bun run build && bun run prepare:cli -- --package",
+    "test": "bun test test",
+    "check-types": "tsgo --noEmit",
+    "typecheck": "bun run check-types"
+  },
+  "dependencies": {
+    "@kilocode/kilo-remote-protocol": "workspace:*",
+    "ws": "8.21.0"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/vscode": "^1.105.1",
+    "@types/ws": "8.18.1",
+    "esbuild": "^0.27.2",
+    "@typescript/native-preview": "catalog:",
+    "@vscode/vsce": "^3.7.1",
+    "@tsconfig/bun": "catalog:",
+    "typescript": "catalog:"
+  }
+}

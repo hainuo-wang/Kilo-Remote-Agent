@@ -84,7 +84,7 @@ export async function activate(context: vscode.ExtensionContext) {
     if (state === "connected") {
       const config = connectionService.getServerConfig()
       if (config) {
-        telemetry.configure(config.baseUrl, config.password)
+        telemetry.configure(config.baseUrl, config.password, connectionService.getFetch())
         // Sync the CLI's PostHog client with the current consent state. The
         // CLI reads KILO_TELEMETRY_LEVEL once at spawn, so without this call
         // a fresh CLI started while VS Code telemetry was off would stay

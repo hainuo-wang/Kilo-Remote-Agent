@@ -1,0 +1,13 @@
+.vscode/**
+.vscode-test/**
+node_modules/**
+.turbo/**
+src/**
+esbuild.js
+script/**
+test/**
+tsconfig.json
+**/*.map
+
+!dist/**
+!bin/**

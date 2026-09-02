@@ -46,7 +46,7 @@ export async function transcribeSpeech(
   if (dir) url.searchParams.set("directory", dir)
 
   try {
-    const res = await fetch(url, {
+    const res = await connection.getFetch()(url, {
       method: "POST",
       signal,
       headers: {

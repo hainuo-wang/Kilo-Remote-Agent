@@ -26,7 +26,13 @@ function provideInstanceContext<E>(
 ): Effect.Effect<HttpServerResponse.HttpServerResponse, E, WorkspaceRouteContext> {
   return Effect.gen(function* () {
     const route = yield* WorkspaceRouteContext
-    const ctx = yield* store.load({ directory: decode(route.directory) })
+    // kilocode_change start - preserve the remote workspace path separately
+    // from the controller's local virtual instance directory.
+    const ctx = yield* store.load({
+      directory: decode(route.directory),
+      ...(route.remoteDirectory ? { remoteDirectory: decode(route.remoteDirectory) } : {}),
+    })
+    // kilocode_change end
     return yield* effect.pipe(
       Effect.provideService(InstanceRef, ctx),
       Effect.provideService(WorkspaceRef, route.workspaceID),

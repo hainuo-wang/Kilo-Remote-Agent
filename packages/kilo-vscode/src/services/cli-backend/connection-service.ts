@@ -6,6 +6,7 @@ import type { ServerConfig } from "./types"
 import { createDuplicateEventFilter, resolveEventSessionId as resolveEventSessionIdPure } from "./connection-utils"
 import { SandboxPreference } from "../sandbox-preference"
 import { ExplicitAbortState } from "./explicit-abort"
+import { createCursorRemoteFetch, type CursorRemoteFetch } from "../../experimental/cursor-remote/controller-client"
 
 export type ConnectionState = "connecting" | "connected" | "disconnected" | "error"
 type SSEEventListener = (event: SSEPayload, directory?: string) => void
@@ -131,6 +132,7 @@ export class KiloConnectionService {
   private viewedSending = false
   private viewedDirty = false
   private unsubRemote: (() => void) | null = null
+  private readonly remoteController: CursorRemoteFetch | undefined
 
   constructor(context: vscode.ExtensionContext, env?: () => Promise<Record<string, string>>) {
     const state =
@@ -141,6 +143,8 @@ export class KiloConnectionService {
       } satisfies Pick<vscode.Memento, "get" | "update">)
     this.sandboxPreference = new SandboxPreference(state)
     this.serverManager = new ServerManager(context, (code, signal) => this.handleServerExit(code, signal), env)
+    this.remoteController = createCursorRemoteFetch(context)
+    if (this.remoteController) context.subscriptions.push(this.remoteController.dispose)
     this.active = vscode.window.state.focused
     this.windowStateDisposable = vscode.window.onDidChangeWindowState((ws) => {
       this.active = ws.focused
@@ -227,6 +231,10 @@ export class KiloConnectionService {
    */
   getServerConfig(): ServerConfig | null {
     return this.config
+  }
+
+  getFetch(): typeof fetch {
+    return this.remoteController?.fetch ?? fetch
   }
 
   /**
@@ -744,14 +752,14 @@ export class KiloConnectionService {
    * If the health check fails while we believe we are connected, the SSE client is
    * disconnected so its reconnect loop kicks in immediately.
    */
-  private startHealthPoll(baseUrl: string, password: string): void {
+  private startHealthPoll(baseUrl: string, password: string, fetcher: typeof fetch = fetch): void {
     this.stopHealthPoll()
 
     this.healthPollTimer = setInterval(async () => {
       if (this.state !== "connected") {
         return
       }
-      const healthy = await this.checkHealth(baseUrl, password)
+      const healthy = await this.checkHealth(baseUrl, password, fetcher)
       if (!healthy && this.state === "connected") {
         console.warn("[Kilo New] ConnectionService: ❤️‍🩹 Health check failed — forcing SSE reconnect")
         this.sseClient?.reconnect()
@@ -769,11 +777,11 @@ export class KiloConnectionService {
     }
   }
 
-  private async checkHealth(baseUrl: string, password: string): Promise<boolean> {
+  private async checkHealth(baseUrl: string, password: string, fetcher: typeof fetch = fetch): Promise<boolean> {
     try {
       const controller = new AbortController()
       const timer = setTimeout(() => controller.abort(), 3000)
-      const res = await fetch(`${baseUrl}/global/health`, {
+      const res = await fetcher(`${baseUrl}/global/health`, {
         headers: { Authorization: `Basic ${Buffer.from(`kilo:${password}`).toString("base64")}` },
         signal: controller.signal,
       })
@@ -811,23 +819,27 @@ export class KiloConnectionService {
     // Never expose a stale SDK client while its replacement server is starting.
     this.resetConnection()
 
-    const server = await this.serverManager.getServer()
-    this.info = { port: server.port }
+    const server = this.remoteController ? undefined : await this.serverManager.getServer()
+    this.info = { port: server?.port ?? 0 }
 
     const config: ServerConfig = {
-      baseUrl: `http://127.0.0.1:${server.port}`,
-      password: server.password,
+      baseUrl: server ? `http://127.0.0.1:${server.port}` : this.remoteController!.baseUrl,
+      password: server?.password ?? "",
     }
 
     this.config = config
 
     // Create SDK client with Basic Auth header
-    const authHeader = `Basic ${Buffer.from(`kilo:${server.password}`).toString("base64")}`
     const client = createKiloClient({
       baseUrl: config.baseUrl,
-      headers: {
-        Authorization: authHeader,
-      },
+      ...(this.remoteController ? { directory: workspaceDir } : {}),
+      ...(server
+        ? {
+            headers: {
+              Authorization: `Basic ${Buffer.from(`kilo:${server.password}`).toString("base64")}`,
+            },
+          }
+        : { fetch: this.remoteController!.fetch }),
     })
     const sse = new SdkSSEAdapter(client)
     const duplicateEvent = createDuplicateEventFilter()
@@ -893,7 +905,7 @@ export class KiloConnectionService {
 
     this.startCheckin()
     // Start the independent health poll once we are confirmed connected.
-    this.startHealthPoll(config.baseUrl, config.password)
+    this.startHealthPoll(config.baseUrl, config.password, this.remoteController?.fetch)
   }
 
   private broadcast(event: SSEPayload, directory?: string): void {

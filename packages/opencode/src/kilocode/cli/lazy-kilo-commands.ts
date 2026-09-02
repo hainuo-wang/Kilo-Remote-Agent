@@ -54,6 +54,12 @@ export const PtySmokeCommand = lazy({
   load: async () => (await import("@/kilocode/cli/cmd/pty-smoke")).PtySmokeCommand,
 })
 
+export const RemoteWorkerCommand = lazy({
+  command: "remote-worker",
+  describe: false,
+  load: async () => (await import("@/kilocode/cli/cmd/remote-worker")).RemoteWorkerCommand,
+})
+
 export const DevSetupCommand = lazy({
   command: "dev-setup",
   describe: "install a `kilodev` shell alias for this checkout",

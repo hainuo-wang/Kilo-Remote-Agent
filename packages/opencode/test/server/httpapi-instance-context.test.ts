@@ -84,6 +84,9 @@ const probeInstanceContext = Effect.gen(function* () {
     directory: instance?.directory,
     worktree: instance?.worktree,
     projectID: instance?.project.id,
+    // kilocode_change start
+    ...(instance?.remoteDirectory ? { remoteDirectory: instance.remoteDirectory } : {}),
+    // kilocode_change end
     workspaceID,
   }
 })
@@ -92,6 +95,7 @@ const ProbeResult = Schema.Struct({
   directory: Schema.optional(Schema.String),
   worktree: Schema.optional(Schema.String),
   projectID: Schema.optional(Schema.String),
+  remoteDirectory: Schema.optional(Schema.String), // kilocode_change
   workspaceID: Schema.optional(Schema.String),
 })
 
@@ -160,6 +164,33 @@ describe("HttpApi instance context middleware", () => {
       })
     }),
   )
+
+  // kilocode_change start - the local controller uses a virtual directory
+  // while the remote tool host needs the actual workspace path.
+  it.live("preserves an encoded remote workspace path separately", () =>
+    Effect.gen(function* () {
+      const dir = yield* tmpdirScoped({ git: true })
+      const virtualDirectory = path.join(dir, "virtual")
+      const remoteDirectory = "/srv/projects/remote workspace"
+      yield* Effect.promise(() => mkdir(virtualDirectory, { recursive: true }))
+      yield* serveProbe()
+
+      const response = yield* HttpClientRequest.get("/probe").pipe(
+        HttpClientRequest.setHeaders({
+          "x-kilo-directory": encodeURIComponent(virtualDirectory),
+          "x-kilo-remote-directory": encodeURIComponent(remoteDirectory),
+        }),
+        HttpClient.execute,
+      )
+
+      expect(response.status).toBe(200)
+      expect(yield* response.json).toMatchObject({
+        directory: virtualDirectory,
+        remoteDirectory,
+      })
+    }),
+  )
+  // kilocode_change end
 
   it.live("falls back to the raw directory when URI decoding fails", () =>
     Effect.gen(function* () {

@@ -15,6 +15,9 @@ export interface LoadInput {
   directory: string
   worktree?: string
   project?: Project.Info
+  // kilocode_change start - preserve the actual workspace path for RemoteToolHost
+  remoteDirectory?: string
+  // kilocode_change end
 }
 
 export interface Interface {
@@ -50,12 +53,18 @@ const layer: Layer.Layer<Service, never, Project.Service | InstanceBootstrap.Ser
                 directory: input.directory,
                 worktree: input.worktree,
                 project: input.project,
+                // kilocode_change start
+                ...(input.remoteDirectory ? { remoteDirectory: input.remoteDirectory } : {}),
+                // kilocode_change end
               }
             : yield* project.fromDirectory(input.directory).pipe(
                 Effect.map((result) => ({
                   directory: input.directory,
                   worktree: result.sandbox,
                   project: result.project,
+                  // kilocode_change start
+                  ...(input.remoteDirectory ? { remoteDirectory: input.remoteDirectory } : {}),
+                  // kilocode_change end
                 })),
               )
         // kilocode_change start - run bootstrap inside the Instance ALS so KilocodeBootstrap
