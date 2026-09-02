@@ -2,7 +2,8 @@
 
 This package is the local-side companion for the Cursor-like Remote SSH
 prototype. It runs in the local VS Code UI extension host while the main Kilo
-extension remains in its normal host placement.
+extension runs in the workspace host. In a normal local window, VS Code has no
+remote extension host, so the workspace extension still executes locally.
 
 When `kilo-code.new.experimental.cursorLikeRemote` is enabled in a Remote SSH
 window, this extension owns:

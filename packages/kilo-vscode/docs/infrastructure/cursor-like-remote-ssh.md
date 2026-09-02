@@ -1,12 +1,14 @@
 # Cursor-like Remote SSH prototype
 
 This prototype keeps the existing Kilo extension behavior for ordinary local
-and Remote SSH workspaces. It does not set `extensionKind: ui` on the main
-extension.
+and Remote SSH workspaces. The main extension is explicitly marked
+`extensionKind: ["workspace"]`: VS Code runs it in the local extension host
+when no remote extension host exists, and in the Remote SSH extension host when
+one does.
 
 ## Placement
 
-The main `kilo-code` extension keeps its normal VS Code placement. The
+The main `kilo-code` extension declares `extensionKind: ["workspace"]`. The
 experimental controller companion declares `extensionKind: ["ui"]`, so it runs
 in the local UI extension host. The remote worker companion declares
 `extensionKind: ["workspace"]`, so it runs in the Remote SSH extension host.
