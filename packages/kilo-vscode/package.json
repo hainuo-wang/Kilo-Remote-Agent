@@ -17,6 +17,9 @@
   "engines": {
     "vscode": "^1.105.1"
   },
+  "extensionKind": [
+    "workspace"
+  ],
   "license": "MIT",
   "author": {
     "name": "Kilo Code"

@@ -20,8 +20,8 @@ function manifest(packageName: string) {
 }
 
 describe("Cursor-like Remote SSH extension placement", () => {
-  test("does not force the main extension into the local UI host", () => {
-    expect(manifest("packages/kilo-vscode").extensionKind).not.toEqual(["ui"])
+  test("places the main extension in the workspace host when remote exists", () => {
+    expect(manifest("packages/kilo-vscode").extensionKind).toEqual(["workspace"])
   })
 
   test("places the controller locally and the worker remotely", () => {
