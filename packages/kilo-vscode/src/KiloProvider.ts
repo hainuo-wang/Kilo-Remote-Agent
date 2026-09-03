@@ -2691,16 +2691,10 @@ export class KiloProvider implements vscode.WebviewViewProvider, TelemetryProper
     }
 
     try {
-      const { data } = await client.provider.list(
-        { directory: this.getWorkspaceDirectory() },
-        { throwOnError: true },
-      )
+      const { data } = await client.provider.list({ directory: this.getWorkspaceDirectory() }, { throwOnError: true })
       const provider = data.all.find((item) => item.id === providerID)
       const configuredBaseURL = provider?.options?.baseURL
-      if (
-        typeof configuredBaseURL !== "string" ||
-        configuredBaseURL.replace(/\/+$/, "") !== url.replace(/\/+$/, "")
-      ) {
+      if (typeof configuredBaseURL !== "string" || configuredBaseURL.replace(/\/+$/, "") !== url.replace(/\/+$/, "")) {
         throw new Error("The requested provider URL does not match the saved local provider configuration.")
       }
       if (!provider) throw new Error("The requested provider is not configured in the local controller.")

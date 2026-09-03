@@ -1184,8 +1184,6 @@ export class AgentManagerProvider implements Disposable {
     return closeLifecycleSession(ctx, this.lifecycleHost, sessionId)
   }
 
-  // Multi-version worktree creation
-
   /** Create N worktree sessions for the same prompt (multi-version mode). */
   private async onCreateMultiVersion(
     msg: Extract<AgentManagerInMessage, { type: "agentManager.createMultiVersion" }>,
