@@ -181,6 +181,29 @@ describe("remote worker", () => {
     ).not.toContain("late")
   })
 
+  test("honors cancellation that arrives before process spawn", async () => {
+    const root = await workspace()
+    const worker = spawnWorker(root)
+    const marker = "cancelled-before-spawn"
+    worker.write(
+      request("early-cancel", "process.run", {
+        rootId: "workspace",
+        cwd: ".",
+        command: `printf spawned > ${marker}`,
+      }),
+    )
+    worker.write({ type: "cancel", version: RPC_VERSION, requestId: "early-cancel", streamId: "early-cancel:process" })
+    await worker.waitFor((message) => message.type === "response" && message.requestId === "early-cancel")
+    const messages = worker.messages
+    worker.end()
+    await worker.done
+
+    expect(response(messages, "early-cancel").error).toMatchObject({
+      code: "CANCELLED",
+    })
+    expect(await readFile(path.join(root, marker), "utf8").catch(() => undefined)).toBeUndefined()
+  })
+
   test("does not expose controller credentials to remote commands", async () => {
     const root = await workspace()
     const worker = spawnWorker(root, {
