@@ -16,6 +16,12 @@ window, this extension owns:
 The remote extension host never receives the Mioffice API key. It only sees
 ordinary backend responses and streamed tool output.
 
+Credential-bearing responses are projected before they cross the command route.
+Remote config/auth writes containing literal credential values are rejected;
+configure Mioffice in the local controller with `Kilo: Configure Local Mioffice
+API Key`. A custom provider must already be saved in the local controller before
+the remote host can discover its models.
+
 The controller uses the OpenAI Responses API by default. Set
 `kilo-code.new.experimental.mioffice.api` to `chat` for an endpoint that only
 implements OpenAI-compatible Chat Completions.

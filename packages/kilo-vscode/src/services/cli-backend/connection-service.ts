@@ -237,6 +237,10 @@ export class KiloConnectionService {
     return this.remoteController?.fetch ?? fetch
   }
 
+  isCursorLikeRemote(): boolean {
+    return this.remoteController !== undefined
+  }
+
   /**
    * Set the remote status service. When remote is disabled, flushViewed()
    * is a no-op. When remote becomes enabled (startup refresh, user toggle,

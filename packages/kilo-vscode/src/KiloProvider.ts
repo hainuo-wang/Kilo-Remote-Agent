@@ -2652,6 +2652,10 @@ export class KiloProvider implements vscode.WebviewViewProvider, TelemetryProper
     const rid = typeof msg.requestId === "string" ? msg.requestId : ""
     const url = typeof msg.baseURL === "string" ? msg.baseURL : ""
     if (!rid || !url) return
+    if (this.connectionService.isCursorLikeRemote()) {
+      await this.handleRemoteProviderModels(rid, url, msg)
+      return
+    }
     const key =
       typeof msg.apiKey === "string" ? msg.apiKey : resolveStoredKey(this.storedProviderKeys, msg.providerID, url)
     const headers = msg.headers && typeof msg.headers === "object" ? (msg.headers as Record<string, string>) : undefined
@@ -2662,6 +2666,58 @@ export class KiloProvider implements vscode.WebviewViewProvider, TelemetryProper
       const message = err instanceof Error ? err.message : "Failed to fetch models"
       const auth = err instanceof FetchModelsError && err.auth
       this.postMessage({ type: "customProviderModelsFetched", requestId: rid, error: message, auth })
+    }
+  }
+
+  private async handleRemoteProviderModels(rid: string, url: string, msg: Record<string, unknown>): Promise<void> {
+    if (typeof msg.apiKey === "string" && msg.apiKey.trim()) {
+      this.postMessage({
+        type: "customProviderModelsFetched",
+        requestId: rid,
+        error: "Model discovery for a new custom provider is disabled in Remote SSH mode. Save the provider first.",
+      })
+      return
+    }
+
+    const providerID = typeof msg.providerID === "string" ? msg.providerID : ""
+    const client = this.client
+    if (!providerID || !client) {
+      this.postMessage({
+        type: "customProviderModelsFetched",
+        requestId: rid,
+        error: "Remote Kilo controller is not connected.",
+      })
+      return
+    }
+
+    try {
+      const { data } = await client.provider.list(
+        { directory: this.getWorkspaceDirectory() },
+        { throwOnError: true },
+      )
+      const provider = data.all.find((item) => item.id === providerID)
+      const configuredBaseURL = provider?.options?.baseURL
+      if (
+        typeof configuredBaseURL !== "string" ||
+        configuredBaseURL.replace(/\/+$/, "") !== url.replace(/\/+$/, "")
+      ) {
+        throw new Error("The requested provider URL does not match the saved local provider configuration.")
+      }
+      if (!provider) throw new Error("The requested provider is not configured in the local controller.")
+
+      const models = Object.values(provider.models)
+        .map((model) => {
+          const id = typeof model.id === "string" ? model.id.trim() : ""
+          return id ? { id, name: typeof model.name === "string" ? model.name.trim() || id : id } : undefined
+        })
+        .filter((model): model is { id: string; name: string } => model !== undefined)
+      this.postMessage({ type: "customProviderModelsFetched", requestId: rid, models })
+    } catch (error: unknown) {
+      this.postMessage({
+        type: "customProviderModelsFetched",
+        requestId: rid,
+        error: error instanceof Error ? error.message : "Failed to load models from the local controller.",
+      })
     }
   }
 

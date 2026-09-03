@@ -75,6 +75,8 @@ export type RpcCancel = {
 
 export type RpcMessage = RpcRequest | RpcResponse | RpcEvent | RpcCancel
 
+const RPC_EVENTS = new Set<RpcEvent["event"]>(["stdout", "stderr", "exit", "error", "closed", "heartbeat"])
+
 export type ControllerHttpRequest = {
   requestId: string
   method: string
@@ -191,13 +193,33 @@ export function isRpcMessage(value: unknown): value is RpcMessage {
   const message = value as Record<string, unknown>
   if (message.version !== RPC_VERSION || typeof message.type !== "string") return false
   if (message.type === "request") {
-    return typeof message.requestId === "string" && typeof message.method === "string"
+    return (
+      typeof message.requestId === "string" &&
+      message.requestId.length > 0 &&
+      typeof message.method === "string" &&
+      message.method.length > 0 &&
+      (message.deadline === undefined || (typeof message.deadline === "number" && Number.isFinite(message.deadline)))
+    )
   }
-  if (message.type === "response") return typeof message.requestId === "string"
+  if (message.type === "response") return typeof message.requestId === "string" && message.requestId.length > 0
   if (message.type === "event") {
-    return typeof message.streamId === "string" && typeof message.seq === "number" && typeof message.event === "string"
+    return (
+      typeof message.streamId === "string" &&
+      message.streamId.length > 0 &&
+      typeof message.seq === "number" &&
+      Number.isInteger(message.seq) &&
+      message.seq >= 0 &&
+      typeof message.event === "string" &&
+      RPC_EVENTS.has(message.event as RpcEvent["event"])
+    )
   }
-  if (message.type === "cancel") return typeof message.requestId === "string"
+  if (message.type === "cancel") {
+    return (
+      typeof message.requestId === "string" &&
+      message.requestId.length > 0 &&
+      (message.streamId === undefined || (typeof message.streamId === "string" && message.streamId.length > 0))
+    )
+  }
   return false
 }
 

@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { sanitizeCredentialValue } from "../src/provider-credential-sanitizer"
 import { StreamingSseDirectoryRewriter } from "../src/sse-directory-rewriter"
 
 const virtualDirectory = "C:\\Users\\user\\AppData\\Kilo\\remote-workspaces\\abc"
@@ -38,5 +39,20 @@ describe("streaming SSE directory rewriting", () => {
     expect(rewriter.write(input)).toHaveLength(0)
     const output = rewriter.end().toString("utf8")
     expect(output).toContain(`"directory":"${remoteDirectory}"`)
+  })
+
+  test("sanitizes credentials in an event without directory rewriting", () => {
+    const rewriter = new StreamingSseDirectoryRewriter(undefined, undefined, sanitizeCredentialValue)
+    const input = Buffer.from(
+      `data: ${JSON.stringify({
+        type: "global.config.updated",
+        properties: { provider: { mioffice: { options: { apiKey: "team-key" } } } },
+      })}\n\n`,
+    )
+
+    const output = Buffer.concat([rewriter.write(input), rewriter.end()]).toString("utf8")
+
+    expect(output).not.toContain("team-key")
+    expect(output).toContain("global.config.updated")
   })
 })

@@ -10,6 +10,7 @@ let heartbeatTimer: ReturnType<typeof setInterval> | undefined
 let heartbeatSequence = 0
 
 export function activate(context: vscode.ExtensionContext) {
+  console.log(`[Kilo Remote Worker] activated host=${process.platform} remote=${vscode.env.remoteName ?? "local"}`)
   if (
     !vscode.env.remoteName?.startsWith("ssh-remote") ||
     !vscode.workspace.getConfiguration("kilo-code.new.experimental").get("cursorLikeRemote", false)
@@ -22,6 +23,7 @@ export function activate(context: vscode.ExtensionContext) {
     console.warn("[Kilo Remote Worker] No workspace folder is open")
     return
   }
+  console.log(`[Kilo Remote Worker] workspace root=${root}`)
 
   const cliPath = resolveCliPath(context)
 

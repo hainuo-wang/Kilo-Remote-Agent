@@ -21,6 +21,15 @@ import {
 import { LocalServerManager } from "./local-server-manager"
 import { rewriteJsonDirectories } from "./json-directory-rewriter"
 import { miofficeControllerEnv } from "./mioffice"
+import {
+  containsLiteralCredential,
+  isCredentialResponsePath,
+  isCredentialRequestPath,
+  isProviderCatalogPath,
+  sanitizeCredentialPayload,
+  sanitizeCredentialValue,
+  sanitizeProviderCatalog,
+} from "./provider-credential-sanitizer"
 import { StreamingSecretRedactor } from "./secret-redactor"
 import { StreamingSseDirectoryRewriter } from "./sse-directory-rewriter"
 import { rewriteWorkspaceDirectory, virtualWorkspaceDirectory } from "./workspace-routing"
@@ -137,19 +146,35 @@ export class ControllerBridge implements vscode.Disposable {
   }
 
   async http(request: ControllerHttpRequest): Promise<ControllerHttpResponse> {
-    const server = await this.serverManager.getServer()
-    this.sensitiveValues.add(server.password)
     const parsed = new URL(request.url)
     if (parsed.origin !== "http://kilo-controller.invalid") {
       throw new Error("Controller HTTP requests must use the local controller origin")
     }
+    const server = await this.serverManager.getServer()
+    this.sensitiveValues.add(server.password)
 
     const abort = new AbortController()
     this.httpRequests.set(request.requestId, abort)
     let bodyIsStreaming = false
     try {
       const headers = { ...request.headers }
-      for (const key of ["host", "Host", "content-length", "Content-Length"]) delete headers[key]
+      for (const key of Object.keys(headers)) {
+        if (/^(?:host|content-length)$/i.test(key) || /(?:authorization|api[-_]?key|token|secret|password)/i.test(key))
+          delete headers[key]
+      }
+      if (isCredentialRequestPath(parsed.pathname) && request.body) {
+        let body: unknown
+        try {
+          body = JSON.parse(Buffer.from(request.body, "base64").toString("utf8"))
+        } catch {
+          body = undefined
+        }
+        if (containsLiteralCredential(body)) {
+          throw new Error(
+            "Remote credential updates are disabled; configure provider credentials in the local controller.",
+          )
+        }
+      }
       const remoteDirectory = findRemoteDirectory(request, parsed)
       const directoryMapping = remoteDirectory
         ? { virtualDirectory: this.virtualDirectory(remoteDirectory), remoteDirectory }
@@ -176,7 +201,15 @@ export class ControllerBridge implements vscode.Disposable {
       const streamId = `http:${request.requestId}`
       bodyIsStreaming = true
       const contentType = response.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase()
-      void this.forwardHttpBody(request.requestId, streamId, response.body, abort.signal, contentType, directoryMapping)
+      void this.forwardHttpBody(
+        request.requestId,
+        streamId,
+        response.body,
+        abort.signal,
+        contentType,
+        directoryMapping,
+        parsed.pathname,
+      )
       return { ...result, streamId }
     } finally {
       if (!bodyIsStreaming) this.httpRequests.delete(request.requestId)
@@ -354,10 +387,9 @@ export class ControllerBridge implements vscode.Disposable {
       requestId: request.requestId,
       error: {
         code: timedOut ? "TIMEOUT" : requestErrorCode(lastError),
-        message:
-          timedOut
-            ? `Remote worker command timed out: ${request.method}`
-            : lastError instanceof Error
+        message: timedOut
+          ? `Remote worker command timed out: ${request.method}`
+          : lastError instanceof Error
             ? lastError.message
             : `Remote worker command was unavailable for ${WORKER_COMMAND_TIMEOUT_MS}ms`,
       },
@@ -371,14 +403,23 @@ export class ControllerBridge implements vscode.Disposable {
     signal: AbortSignal,
     contentType?: string,
     directoryMapping?: { virtualDirectory: string; remoteDirectory: string },
+    pathname?: string,
   ) {
     const reader = body.getReader()
     const redactor = new StreamingSecretRedactor(this.sensitiveValues)
     const sseRewriter =
-      contentType === "text/event-stream" && directoryMapping
-        ? new StreamingSseDirectoryRewriter(directoryMapping.virtualDirectory, directoryMapping.remoteDirectory)
+      contentType === "text/event-stream" && (directoryMapping || (pathname && isCredentialResponsePath(pathname)))
+        ? new StreamingSseDirectoryRewriter(
+            directoryMapping?.virtualDirectory,
+            directoryMapping?.remoteDirectory,
+            pathname && isCredentialResponsePath(pathname) ? sanitizeCredentialValue : undefined,
+          )
         : undefined
-    const jsonChunks: Buffer[] | undefined = contentType?.endsWith("json") && directoryMapping ? [] : undefined
+    const jsonChunks: Buffer[] | undefined =
+      contentType !== "text/event-stream" &&
+      (directoryMapping || (pathname && isCredentialResponsePath(pathname)))
+        ? []
+        : undefined
     let sequence = 0
     try {
       while (true) {
@@ -394,13 +435,17 @@ export class ControllerBridge implements vscode.Disposable {
         if (chunk.byteLength > 0) await this.forwardHttpChunk(streamId, sequence++, chunk)
       }
       if (!signal.aborted) {
-        const rewrittenFinal = jsonChunks
-          ? rewriteJsonDirectories(
-              Buffer.concat(jsonChunks),
-              directoryMapping!.virtualDirectory,
-              directoryMapping!.remoteDirectory,
-            )
-          : (sseRewriter?.end() ?? Buffer.alloc(0))
+        let rewrittenFinal = jsonChunks ? Buffer.concat(jsonChunks) : (sseRewriter?.end() ?? Buffer.alloc(0))
+        if (directoryMapping) {
+          rewrittenFinal = rewriteJsonDirectories(
+            rewrittenFinal,
+            directoryMapping.virtualDirectory,
+            directoryMapping.remoteDirectory,
+          )
+        }
+        if (pathname && isProviderCatalogPath(pathname)) rewrittenFinal = sanitizeProviderCatalog(rewrittenFinal)
+        else if (pathname && isCredentialResponsePath(pathname))
+          rewrittenFinal = sanitizeCredentialPayload(rewrittenFinal)
         const finalRewritten = redactor.write(rewrittenFinal)
         if (finalRewritten.byteLength > 0) await this.forwardHttpChunk(streamId, sequence++, finalRewritten)
         const final = redactor.end()
@@ -450,7 +495,11 @@ export class ControllerBridge implements vscode.Disposable {
 
   private redactHeaders(headers: Record<string, string>, hasBody: boolean): Record<string, string> {
     const redactor = new StreamingSecretRedactor(this.sensitiveValues)
-    const result = Object.fromEntries(Object.entries(headers).map(([key, value]) => [key, redactor.redactText(value)]))
+    const result = Object.fromEntries(
+      Object.entries(headers)
+        .filter(([key]) => !/(?:authorization|api[-_]?key|token|secret|password)/i.test(key))
+        .map(([key, value]) => [key, redactor.redactText(value)]),
+    )
     if (hasBody) {
       for (const key of ["content-length", "content-encoding", "content-md5", "content-range", "etag"])
         delete result[key]

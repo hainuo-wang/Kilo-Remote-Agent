@@ -1,11 +1,14 @@
 import { rewriteJsonValue } from "./json-directory-rewriter"
 
+type JsonValueRewriter = (value: unknown) => { value: unknown; changed: boolean }
+
 export class StreamingSseDirectoryRewriter {
   private pending = Buffer.alloc(0)
 
   constructor(
-    private readonly virtualDirectory: string,
-    private readonly remoteDirectory: string,
+    private readonly virtualDirectory?: string,
+    private readonly remoteDirectory?: string,
+    private readonly valueRewriter?: JsonValueRewriter,
   ) {}
 
   write(chunk: Uint8Array): Buffer {
@@ -49,12 +52,19 @@ export class StreamingSseDirectoryRewriter {
     }
 
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return frame
-    const rewritten = rewriteJsonValue(parsed, this.virtualDirectory, this.remoteDirectory)
-    if (!rewritten.changed) return frame
+    const directoryRewrite =
+      this.virtualDirectory !== undefined && this.remoteDirectory !== undefined
+        ? rewriteJsonValue(parsed, this.virtualDirectory, this.remoteDirectory)
+        : { value: parsed, changed: false }
+    const valueRewrite = this.valueRewriter?.(directoryRewrite.value) ?? {
+      value: directoryRewrite.value,
+      changed: false,
+    }
+    if (!directoryRewrite.changed && !valueRewrite.changed) return frame
 
     const firstDataLine = dataLines[0]
     if (!firstDataLine) return frame
-    const replacement = JSON.stringify(rewritten.value)
+    const replacement = JSON.stringify(valueRewrite.value)
     if (dataLines.length === 1) {
       const line = lines[firstDataLine.index]
       if (line === undefined) return frame

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
+import { isRpcMessage, RPC_VERSION } from "@kilocode/kilo-remote-protocol"
 
 const repo = join(import.meta.dir, "../../../..")
 
@@ -53,5 +54,38 @@ describe("Cursor-like Remote SSH extension placement", () => {
   test("activates both companions after the remote window is ready", () => {
     expect(manifest("packages/kilo-vscode-remote-controller").activationEvents).toContain("onStartupFinished")
     expect(manifest("packages/kilo-vscode-remote-worker").activationEvents).toContain("onStartupFinished")
+  })
+
+  test("rejects malformed streaming RPC messages", () => {
+    expect(
+      isRpcMessage({
+        type: "event",
+        version: RPC_VERSION,
+        streamId: "process",
+        seq: 0.5,
+        event: "stdout",
+        data: {},
+      }),
+    ).toBe(false)
+    expect(
+      isRpcMessage({
+        type: "event",
+        version: RPC_VERSION,
+        streamId: "process",
+        seq: 0,
+        event: "unknown",
+        data: {},
+      }),
+    ).toBe(false)
+    expect(
+      isRpcMessage({
+        type: "event",
+        version: RPC_VERSION,
+        streamId: "process",
+        seq: 0,
+        event: "stdout",
+        data: {},
+      }),
+    ).toBe(true)
   })
 })

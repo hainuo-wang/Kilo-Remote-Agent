@@ -58,6 +58,12 @@ local controller.
 The worker and process implementation also remove known controller credential
 variables as defense in depth.
 
+Credential-bearing backend responses are projected before they cross the
+command route. Remote config/auth writes containing literal credential values
+are rejected. Configure the Mioffice key with `Kilo: Configure Local Mioffice API
+Key`; a custom provider must already be saved in the local controller before
+the remote host can discover its models.
+
 Requests whose URL is the local Kilo backend origin use the controller fetcher
 and therefore stay on the local side. Marketplace downloads and arbitrary
 external provider model catalogs remain outside this PoC and keep their

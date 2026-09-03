@@ -96,6 +96,39 @@ describe("remote worker", () => {
     })
   })
 
+  test("forwards small output before the remote process exits", async () => {
+    const root = await workspace()
+    const worker = spawnWorker(root)
+    worker.write(
+      request("streaming", "process.run", {
+        rootId: "workspace",
+        cwd: ".",
+        command: "printf 'early\\n'; sleep 1; printf 'late\\n'",
+      }),
+    )
+    await worker.waitFor((message) => message.type === "response" && message.requestId === "streaming")
+    const started = performance.now()
+    await Promise.race([
+      worker.waitFor(
+        (message) =>
+          message.type === "event" &&
+          message.streamId === "streaming:process" &&
+          message.event === "stdout" &&
+          Buffer.from((message.data as { chunk: string }).chunk, "base64")
+            .toString("utf8")
+            .includes("early"),
+      ),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("early output was not streamed")), 750)),
+    ])
+    expect(performance.now() - started).toBeLessThan(750)
+    expect(worker.messages.some((message) => message.type === "event" && message.event === "exit")).toBe(false)
+    await worker.waitFor(
+      (message) => message.type === "event" && message.streamId === "streaming:process" && message.event === "exit",
+    )
+    worker.end()
+    await worker.done
+  })
+
   test("closes stdin for non-interactive processes", async () => {
     const root = await workspace()
     const worker = spawnWorker(root)

@@ -51,6 +51,8 @@ export async function runRemoteWorker(options: WorkerOptions): Promise<void> {
   const root = await realpath(resolve(options.root))
   const active = new Map<string, ActiveProcess>()
   const ptys = new Map<string, ActivePty>()
+  const cancelled = new Set<string>()
+  const inFlight = new Set<string>()
   let writeQueue = Promise.resolve()
 
   const send = (message: RpcResponse | RpcEvent) => {
@@ -112,14 +114,20 @@ export async function runRemoteWorker(options: WorkerOptions): Promise<void> {
     }
 
     if (message.type === "cancel") {
-      await cancel(message, active, ptys)
+      await cancel(message, active, ptys, cancelled, inFlight)
       continue
     }
 
     if (message.type !== "request") continue
-    const task = handleRequest(message, { root, active, ptys, send, response }).catch(async (error) => {
-      await response(message.requestId, undefined, rpcError("INTERNAL", errorMessage(error)))
-    })
+    inFlight.add(message.requestId)
+    const task = handleRequest(message, { root, active, ptys, cancelled, send, response })
+      .catch(async (error) => {
+        await response(message.requestId, undefined, rpcError("INTERNAL", errorMessage(error)))
+      })
+      .finally(() => {
+        inFlight.delete(message.requestId)
+        cancelled.delete(message.requestId)
+      })
     pending.add(task)
     void task.finally(() => pending.delete(task))
   }
@@ -135,6 +143,7 @@ async function handleRequest(
     root: string
     active: Map<string, ActiveProcess>
     ptys: Map<string, ActivePty>
+    cancelled: Set<string>
     send: (message: RpcResponse | RpcEvent) => Promise<void>
     response: (requestId: string, result?: unknown, error?: ReturnType<typeof rpcError>) => Promise<void>
   },
@@ -378,6 +387,7 @@ async function runProcessRequest(
   context: {
     root: string
     active: Map<string, ActiveProcess>
+    cancelled: Set<string>
     send: (message: RpcResponse | RpcEvent) => Promise<void>
     response: (requestId: string, result?: unknown, error?: ReturnType<typeof rpcError>) => Promise<void>
   },
@@ -390,6 +400,9 @@ async function runProcessRequest(
   const cwd = await safePath(context.root, input.cwd ?? ".")
   const info = await stat(cwd)
   if (!info.isDirectory()) throw new WorkerError("INVALID_REQUEST", "process.run cwd must be a directory")
+  if (context.cancelled.delete(request.requestId)) {
+    throw new WorkerError("CANCELLED", "process.run was cancelled before it started")
+  }
 
   const streamId = `${request.requestId}:process`
   const child = spawn(input.command, {
@@ -406,8 +419,6 @@ async function runProcessRequest(
   let sequence = 0
   let stdoutBytes = 0
   let stderrBytes = 0
-  let stdoutPending = Buffer.alloc(0)
-  let stderrPending = Buffer.alloc(0)
   let settled = false
   let outputQueue = Promise.resolve()
   let resolveDone!: () => void
@@ -430,29 +441,14 @@ async function runProcessRequest(
     })
   const emit = (event: RpcEvent["event"], data: unknown) => enqueue(() => sendEvent(event, data))
   const emitOutput = async (event: "stdout" | "stderr", chunk: Buffer) => {
-    const pending = event === "stdout" ? Buffer.concat([stdoutPending, chunk]) : Buffer.concat([stderrPending, chunk])
     if (event === "stdout") stdoutBytes += chunk.byteLength
     else stderrBytes += chunk.byteLength
-    let offset = 0
-    while (pending.byteLength - offset >= BATCH_SIZE) {
+    for (let offset = 0; offset < chunk.byteLength; offset += BATCH_SIZE) {
       await sendEvent(event, {
         encoding: "base64",
-        chunk: pending.subarray(offset, offset + BATCH_SIZE).toString("base64"),
+        chunk: chunk.subarray(offset, offset + BATCH_SIZE).toString("base64"),
       })
-      offset += BATCH_SIZE
     }
-    const remainder = pending.subarray(offset)
-    if (event === "stdout") stdoutPending = remainder
-    else stderrPending = remainder
-  }
-  const flushOutput = (event: "stdout" | "stderr") => {
-    const pending = event === "stdout" ? stdoutPending : stderrPending
-    if (pending.byteLength > 0) {
-      if (event === "stdout") stdoutPending = Buffer.alloc(0)
-      else stderrPending = Buffer.alloc(0)
-      return emit(event, { encoding: "base64", chunk: pending.toString("base64") })
-    }
-    return outputQueue
   }
 
   const queueOutput = (event: "stdout" | "stderr", chunk: Buffer) => {
@@ -471,9 +467,6 @@ async function runProcessRequest(
     settled = true
     context.active.delete(request.requestId)
     void (async () => {
-      await outputQueue
-      await flushOutput("stdout")
-      await flushOutput("stderr")
       await outputQueue
       const exit: ProcessExit = {
         exitCode,
@@ -517,6 +510,7 @@ async function startPtyRequest(
   context: {
     root: string
     ptys: Map<string, ActivePty>
+    cancelled: Set<string>
     send: (message: RpcResponse | RpcEvent) => Promise<void>
     response: (requestId: string, result?: unknown, error?: ReturnType<typeof rpcError>) => Promise<void>
   },
@@ -531,6 +525,9 @@ async function startPtyRequest(
   const shell = typeof input.shell === "string" && input.shell.length > 0 ? input.shell : Shell.preferred()
   const cols = positiveInteger(input.cols, 100)
   const rows = positiveInteger(input.rows, 24)
+  if (context.cancelled.delete(request.requestId)) {
+    throw new WorkerError("CANCELLED", "pty.start was cancelled before it started")
+  }
   const args = Shell.args(shell, input.command, cwd)
   const { spawn } = await import("@opencode-ai/core/pty/driver")
   const proc = spawn(shell, args, {
@@ -650,7 +647,13 @@ async function ptyCloseRequest(
   await context.response(request.requestId, {})
 }
 
-async function cancel(message: RpcCancel, active: Map<string, ActiveProcess>, ptys: Map<string, ActivePty>) {
+async function cancel(
+  message: RpcCancel,
+  active: Map<string, ActiveProcess>,
+  ptys: Map<string, ActivePty>,
+  cancelled: Set<string>,
+  inFlight: Set<string>,
+) {
   const process = active.get(message.requestId)
   if (process) {
     terminate(process.child)
@@ -659,6 +662,7 @@ async function cancel(message: RpcCancel, active: Map<string, ActiveProcess>, pt
   const streamId = message.streamId ?? `${message.requestId}:pty`
   const pty = ptys.get(streamId)
   if (pty) await KiloPtyTermination.terminate(pty.proc).catch(() => undefined)
+  else if (inFlight.has(message.requestId)) cancelled.add(message.requestId)
 }
 
 function terminate(child: ChildProcess) {
