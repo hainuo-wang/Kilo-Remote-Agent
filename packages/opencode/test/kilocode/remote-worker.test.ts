@@ -204,6 +204,39 @@ describe("remote worker", () => {
     expect(await readFile(path.join(root, marker), "utf8").catch(() => undefined)).toBeUndefined()
   })
 
+  test("applies an explicit process timeout on the remote host", async () => {
+    const root = await workspace()
+    const worker = spawnWorker(root)
+    worker.write(
+      request("timeout", "process.run", {
+        rootId: "workspace",
+        cwd: ".",
+        command: "sleep 30",
+        timeoutMs: 100,
+      }),
+    )
+    await worker.waitFor((message) => message.type === "response" && message.requestId === "timeout")
+    const messages = await Promise.race([
+      worker.waitFor(
+        (message) => message.type === "event" && message.streamId === "timeout:process" && message.event === "error",
+      ).then(() => worker.messages),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("remote timeout was not emitted")), 5_000)),
+    ])
+    worker.end()
+    await worker.done
+
+    expect(response(messages, "timeout").error).toBeUndefined()
+    expect(
+      messages.find(
+        (message): message is RpcEvent =>
+          message.type === "event" && message.streamId === "timeout:process" && message.event === "error",
+      ),
+    ).toMatchObject({
+      event: "error",
+      data: { code: "TIMEOUT" },
+    })
+  })
+
   test("does not expose controller credentials to remote commands", async () => {
     const root = await workspace()
     const worker = spawnWorker(root, {

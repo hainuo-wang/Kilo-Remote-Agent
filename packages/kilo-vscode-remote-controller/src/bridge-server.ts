@@ -38,7 +38,7 @@ export const HTTP_COMMAND = REMOTE_COMMANDS.controllerHttp
 export const HTTP_CANCEL_COMMAND = REMOTE_COMMANDS.controllerHttpCancel
 const WORKER_HEARTBEAT_TIMEOUT_MS = 20_000
 const WORKER_HEARTBEAT_CHECK_INTERVAL_MS = 5_000
-const WORKER_COMMAND_TIMEOUT_MS = 30_000
+const WORKER_COMMAND_HANDSHAKE_TIMEOUT_MS = 30_000
 
 export class ControllerBridge implements vscode.Disposable {
   private readonly token = randomBytes(32).toString("hex")
@@ -360,7 +360,7 @@ export class ControllerBridge implements vscode.Disposable {
   }
 
   private async request(request: RpcRequest): Promise<RpcResponse> {
-    const deadline = Math.min(request.deadline ?? Number.POSITIVE_INFINITY, Date.now() + WORKER_COMMAND_TIMEOUT_MS)
+    const deadline = Date.now() + WORKER_COMMAND_HANDSHAKE_TIMEOUT_MS
     let lastError: unknown
     let timedOut = false
     try {
@@ -391,7 +391,7 @@ export class ControllerBridge implements vscode.Disposable {
           ? `Remote worker command timed out: ${request.method}`
           : lastError instanceof Error
             ? lastError.message
-            : `Remote worker command was unavailable for ${WORKER_COMMAND_TIMEOUT_MS}ms`,
+            : `Remote worker command was unavailable for ${WORKER_COMMAND_HANDSHAKE_TIMEOUT_MS}ms`,
       },
     }
   }
