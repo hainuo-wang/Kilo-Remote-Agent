@@ -242,6 +242,7 @@ describe("remote worker", () => {
   test("does not expose controller credentials to remote commands", async () => {
     const root = await workspace()
     const worker = spawnWorker(root, {
+      DUCKCODING_API_KEY: "duckcoding-secret",
       MIOFFICE_API_KEY: "team-secret",
       MIOFFICE_TEAM_KEY: "team-secret-variant",
       OPENAI_API_KEY: "openai-secret",
@@ -265,6 +266,8 @@ describe("remote worker", () => {
     const output = bytes(events, "stdout").toString("utf8")
 
     expect(response(messages, "env").error).toBeUndefined()
+    expect(output).not.toContain("DUCKCODING_API_KEY")
+    expect(output).not.toContain("duckcoding-secret")
     expect(output).not.toContain("MIOFFICE_API_KEY")
     expect(output).not.toContain("MIOFFICE_TEAM_KEY")
     expect(output).not.toContain("team-secret")

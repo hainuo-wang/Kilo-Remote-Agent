@@ -176,8 +176,9 @@ function terminate(child: ChildProcess | undefined, signal: NodeJS.Signals = "SI
 }
 
 function buildProxyEnv(): Record<string, string> {
+  const controllerProxy = vscode.workspace.getConfiguration("kilo-code.remoteController").get<string>("proxy", "").trim()
   const config = vscode.workspace.getConfiguration("http")
-  const proxy = config.get<string>("proxy")
+  const proxy = controllerProxy || config.get<string>("proxy")
   const noProxy = config.get<string[]>("noProxy")
   const proxyInfo = config.inspect<string>("proxy")
   const noProxyInfo = config.inspect<string[]>("noProxy")
@@ -203,7 +204,7 @@ function buildProxyEnv(): Record<string, string> {
       noProxyInfo.workspaceFolderLanguageValue,
     ].some((value) => value !== undefined)
 
-  if (config.get<string>("proxySupport") === "off") {
+  if (!controllerProxy && config.get<string>("proxySupport") === "off") {
     return {
       HTTP_PROXY: "",
       HTTPS_PROXY: "",
@@ -214,10 +215,11 @@ function buildProxyEnv(): Record<string, string> {
     }
   }
   if (proxy?.trim()) {
-    env.HTTP_PROXY = proxy
-    env.HTTPS_PROXY = proxy
-    env.http_proxy = proxy
-    env.https_proxy = proxy
+    const value = proxy.trim()
+    env.HTTP_PROXY = value
+    env.HTTPS_PROXY = value
+    env.http_proxy = value
+    env.https_proxy = value
   } else if (proxySet) {
     env.HTTP_PROXY = ""
     env.HTTPS_PROXY = ""

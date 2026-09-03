@@ -12,7 +12,7 @@ export const REMOTE_COMMANDS = {
   controllerPtyClose: "kilo-code.new.internal.controller.pty.close",
 } as const
 
-const CONTROLLER_CREDENTIAL_ENVIRONMENT_KEY = /^(?:MIOFFICE|OPENAI|ANTHROPIC)(?:_|$)/i
+const CONTROLLER_CREDENTIAL_ENVIRONMENT_KEY = /^(?:DUCKCODING|MIOFFICE|OPENAI|ANTHROPIC)(?:_|$)/i
 
 export function isControllerCredentialEnvironmentKey(key: string): boolean {
   return (

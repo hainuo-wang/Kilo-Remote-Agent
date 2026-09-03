@@ -93,8 +93,8 @@
         {
           "id": "kilo-code-ActivityBar",
           "title": "Kilo Code",
-          "icon": "assets/icons/kilo-light.png",
-          "darkIcon": "assets/icons/kilo-dark.png"
+          "icon": "assets/icons/kilo-dark.png",
+          "darkIcon": "assets/icons/kilo-light.png"
         }
       ]
     },
@@ -1080,17 +1080,45 @@
           "scope": "application",
           "description": "Run the Kilo controller locally and execute workspace tools through the VS Code Remote SSH extension host."
         },
+        "kilo-code.new.experimental.duckcoding.baseURL": {
+          "type": "string",
+          "default": "https://api.duckcoding.ai/v1",
+          "scope": "application",
+          "description": "OpenAI-compatible DuckCoding endpoint used by the local Kilo controller."
+        },
+        "kilo-code.new.experimental.duckcoding.model": {
+          "type": "string",
+          "default": "gpt-5.6-sol",
+          "scope": "application",
+          "description": "DuckCoding model ID used by the local Kilo controller."
+        },
+        "kilo-code.new.experimental.duckcoding.api": {
+          "type": "string",
+          "enum": [
+            "responses",
+            "chat"
+          ],
+          "enumDescriptions": [
+            "Use the OpenAI Responses API.",
+            "Use the OpenAI-compatible Chat Completions API."
+          ],
+          "default": "responses",
+          "scope": "application",
+          "description": "DuckCoding API protocol used by the local Kilo controller."
+        },
         "kilo-code.new.experimental.mioffice.baseURL": {
           "type": "string",
           "default": "https://api.llm.mioffice.cn/v1",
           "scope": "application",
-          "description": "OpenAI-compatible Mioffice endpoint used by the local Kilo controller."
+          "deprecationMessage": "Use kilo-code.new.experimental.duckcoding.baseURL instead.",
+          "description": "Legacy Mioffice endpoint retained for configuration migration."
         },
         "kilo-code.new.experimental.mioffice.model": {
           "type": "string",
           "default": "ppio/pa/gpt-5.6-sol",
           "scope": "application",
-          "description": "Mioffice model ID used by the local Kilo controller."
+          "deprecationMessage": "Use kilo-code.new.experimental.duckcoding.model instead.",
+          "description": "Legacy Mioffice model retained for configuration migration."
         },
         "kilo-code.new.experimental.mioffice.api": {
           "type": "string",
@@ -1104,7 +1132,8 @@
           ],
           "default": "responses",
           "scope": "application",
-          "description": "Mioffice API protocol used by the local Kilo controller."
+          "deprecationMessage": "Use kilo-code.new.experimental.duckcoding.api instead.",
+          "description": "Legacy Mioffice protocol retained for configuration migration."
         },
         "kilo-code.new.agentManager.terminalButtonDestination": {
           "type": "string",

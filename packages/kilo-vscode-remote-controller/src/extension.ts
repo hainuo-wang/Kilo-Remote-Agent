@@ -2,7 +2,7 @@ import * as vscode from "vscode"
 import type { RpcEvent, RpcRequest, RpcResponse } from "@kilocode/kilo-remote-protocol"
 import { REMOTE_COMMANDS, RPC_VERSION } from "@kilocode/kilo-remote-protocol"
 import { ControllerBridge, HTTP_CANCEL_COMMAND, HTTP_COMMAND } from "./bridge-server"
-import { configureMioffice } from "./mioffice"
+import { configureDuckcoding } from "./duckcoding"
 
 const SMOKE_COMMAND = "kilo-code.new.remote.runSmoke"
 const REQUEST_TIMEOUT_MS = 30_000
@@ -21,7 +21,8 @@ let bridge: ControllerBridge | undefined
 export function activate(context: vscode.ExtensionContext) {
   console.log(`[Kilo Remote Controller] activated host=${process.platform} remote=${vscode.env.remoteName ?? "local"}`)
   context.subscriptions.push(
-    vscode.commands.registerCommand("kilo-code.new.remote.configureMioffice", () => configureMioffice(context)),
+    vscode.commands.registerCommand("kilo-code.new.remote.configureDuckcoding", () => configureDuckcoding(context)),
+    vscode.commands.registerCommand("kilo-code.new.remote.configureMioffice", () => configureDuckcoding(context)),
   )
   if (
     !vscode.env.remoteName?.startsWith("ssh-remote") ||
@@ -131,7 +132,7 @@ async function runSmoke() {
 
     const process = await runRemoteProcess(
       `printf 'stdout\\n'; printf 'stderr\\n' >&2; pwd; uname -a; ` +
-        `if env | grep -Eiq '(^|_)(MIOFFICE|OPENAI|ANTHROPIC)(_|$)'; then ` +
+        `if env | grep -Eiq '(^|_)(DUCKCODING|MIOFFICE|OPENAI|ANTHROPIC)(_|$)'; then ` +
         `printf 'controller credential leaked to remote process\\n' >&2; exit 42; fi; ` +
         `git diff --no-ext-diff --stat >/dev/null 2>&1 || true; cat ${shellQuote(filePath)}`,
     )

@@ -19,7 +19,7 @@ window:
 ```text
 Local UI extension
   ├── local kilo serve
-  ├── Mioffice provider and SecretStorage
+  ├── DuckCoding provider and SecretStorage
   ├── Agent loop and session state
   └── localhost authenticated worker bridge
           │
@@ -40,8 +40,8 @@ created.
 
 ## Credential boundary
 
-The Mioffice key is stored in the local controller extension's VS Code
-`SecretStorage` under `mioffice.apiKey`. It is injected only into the local
+The DuckCoding key is stored in the local controller extension's VS Code
+`SecretStorage` under `duckcoding.apiKey`. It is injected only into the local
 `kilo serve` environment. It is not included in:
 
 - workspace files;
@@ -50,24 +50,25 @@ The Mioffice key is stored in the local controller extension's VS Code
 - command-RPC HTTP parameters; or
 - remote process environments.
 
-The Mioffice protocol defaults to the OpenAI Responses API. Set
-`kilo-code.new.experimental.mioffice.api` to `chat` when the compatible
-endpoint only exposes Chat Completions. Both protocols execute inside the
-local controller.
+The DuckCoding provider defaults to model `gpt-5.6-sol` and the OpenAI
+Responses API. Set `kilo-code.new.experimental.duckcoding.api` to `chat` only
+when the compatible endpoint exposes Chat Completions instead. Both protocols
+execute inside the local controller.
 
 The worker and process implementation also remove known controller credential
 variables as defense in depth.
 
 Credential-bearing backend responses are projected before they cross the
 command route. Remote config/auth writes containing literal credential values
-are rejected. Configure the Mioffice key with `Kilo: Configure Local Mioffice API
-Key`; a custom provider must already be saved in the local controller before
-the remote host can discover its models.
+are rejected. Configure the DuckCoding key with `Kilo: Configure Local DuckCoding
+API Key`; a custom provider must already be saved in the local controller before
+the remote host can discover its models. Existing `mioffice.*` settings and the
+`mioffice.apiKey` secret are accepted as migration fallbacks.
 
 Requests whose URL is the local Kilo backend origin use the controller fetcher
 and therefore stay on the local side. Marketplace downloads and arbitrary
 external provider model catalogs remain outside this PoC and keep their
-existing direct-fetch behavior; they are not part of the Mioffice credential
+existing direct-fetch behavior; they are not part of the DuckCoding credential
 path and are not treated as Remote SSH-safe services.
 
 ## Current PoC scope
@@ -131,15 +132,19 @@ put the API key in settings, the workspace, or a remote environment:
 ```json
 {
   "kilo-code.new.experimental.cursorLikeRemote": true,
-  "kilo-code.new.experimental.mioffice.baseURL": "https://api.llm.mioffice.cn/v1",
-  "kilo-code.new.experimental.mioffice.model": "ppio/pa/gpt-5.6-sol",
-  "kilo-code.new.experimental.mioffice.api": "responses"
+  "kilo-code.new.experimental.duckcoding.baseURL": "https://api.duckcoding.ai/v1",
+  "kilo-code.new.experimental.duckcoding.model": "gpt-5.6-sol",
+  "kilo-code.new.experimental.duckcoding.api": "responses",
+  "kilo-code.remoteController.proxy": "http://127.0.0.1:7897"
 }
 ```
 
+`kilo-code.remoteController.proxy` is optional and applies only to the local
+Controller process. Do not configure it in remote settings.
+
 Install the main extension and the two companion VSIX files. Install the
 controller VSIX in the local extension host and the worker VSIX in the Remote
-SSH extension host. Then run `Kilo: Configure Local Mioffice API Key`; the
+SSH extension host. Then run `Kilo: Configure Local DuckCoding API Key`; the
 value is stored in local `SecretStorage`. Reload the window after changing the
 key and run `Kilo: Run Remote Worker Smoke Test`.
 
@@ -153,10 +158,10 @@ On the remote host, verify the credential boundary independently:
 
 ```sh
 env | grep -i api
-curl --connect-timeout 5 https://api.llm.mioffice.cn
+curl --connect-timeout 5 https://api.duckcoding.ai
 ```
 
-The first command must not show the Mioffice Team Key, and the second command
+The first command must not show the DuckCoding API key, and the second command
 should fail in an intentionally offline server environment. Disconnect and
 reconnect Remote SSH while a remote command is running; the active operation
 should return a remote-disconnect error, the local Agent should remain alive,

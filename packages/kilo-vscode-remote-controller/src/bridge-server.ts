@@ -25,7 +25,7 @@ import {
 } from "@kilocode/kilo-remote-protocol"
 import { LocalServerManager } from "./local-server-manager"
 import { rewriteJsonDirectories } from "./json-directory-rewriter"
-import { miofficeControllerEnv } from "./mioffice"
+import { duckcodingControllerEnv } from "./duckcoding"
 import {
   containsLiteralCredential,
   isCredentialResponsePath,
@@ -161,9 +161,9 @@ export class ControllerBridge implements vscode.Disposable {
     }
     const env = {
       ...(await this.env()),
-      ...(await miofficeControllerEnv(true, this.context)),
+      ...(await duckcodingControllerEnv(true, this.context)),
     }
-    for (const key of ["MIOFFICE_API_KEY", "KILO_REMOTE_BRIDGE_TOKEN"]) {
+    for (const key of ["DUCKCODING_API_KEY", "MIOFFICE_API_KEY", "KILO_REMOTE_BRIDGE_TOKEN"]) {
       const value = env[key]
       if (value) this.sensitiveValues.add(value)
     }

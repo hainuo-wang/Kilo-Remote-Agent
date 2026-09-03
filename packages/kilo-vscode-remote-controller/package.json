@@ -31,6 +31,12 @@
           "type": "string",
           "description": "Optional local path to the Kilo CLI used by the controller.",
           "scope": "machine"
+        },
+        "kilo-code.remoteController.proxy": {
+          "type": "string",
+          "default": "",
+          "description": "Optional HTTP proxy used only by the local Kilo controller for model requests. This value is never sent to the remote worker.",
+          "scope": "machine"
         }
       }
     },
@@ -40,8 +46,12 @@
         "title": "Kilo: Run Remote Worker Smoke Test"
       },
       {
+        "command": "kilo-code.new.remote.configureDuckcoding",
+        "title": "Kilo: Configure Local DuckCoding API Key"
+      },
+      {
         "command": "kilo-code.new.remote.configureMioffice",
-        "title": "Kilo: Configure Local Mioffice API Key"
+        "title": "Kilo: Configure Local Mioffice API Key (Legacy)"
       }
     ]
   },

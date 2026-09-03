@@ -9,22 +9,31 @@ When `kilo-code.new.experimental.cursorLikeRemote` is enabled in a Remote SSH
 window, this extension owns:
 
 - the local `kilo serve` process;
-- the local Mioffice provider configuration and SecretStorage lookup;
+- the local DuckCoding provider configuration and SecretStorage lookup;
 - the authenticated localhost WebSocket bridge used by remote tools; and
 - the command-RPC HTTP/SSE proxy used by the remote main extension.
 
-The remote extension host never receives the Mioffice API key. It only sees
+The remote extension host never receives the DuckCoding API key. It only sees
 ordinary backend responses and streamed tool output.
 
 Credential-bearing responses are projected before they cross the command route.
 Remote config/auth writes containing literal credential values are rejected;
-configure Mioffice in the local controller with `Kilo: Configure Local Mioffice
-API Key`. A custom provider must already be saved in the local controller before
-the remote host can discover its models.
+configure DuckCoding in the local controller with `Kilo: Configure Local
+DuckCoding API Key`. A custom provider must already be saved in the local
+controller before the remote host can discover its models. Existing `mioffice.*`
+settings and the `mioffice.apiKey` secret are read as migration fallbacks.
 
-The controller uses the OpenAI Responses API by default. Set
-`kilo-code.new.experimental.mioffice.api` to `chat` for an endpoint that only
-implements OpenAI-compatible Chat Completions.
+The controller uses the DuckCoding model `gpt-5.6-sol` and OpenAI Responses API
+by default. The default API endpoint is `https://api.duckcoding.ai/v1`.
+Configure `kilo-code.new.experimental.duckcoding.baseURL` only when using a
+different compatible endpoint. Set `kilo-code.new.experimental.duckcoding.api`
+to `chat` only for an endpoint that implements OpenAI-compatible Chat
+Completions.
+
+If the local machine reaches DuckCoding through a proxy, set
+`kilo-code.remoteController.proxy`. The proxy is added only to the local
+`kilo serve` environment and is never included in Remote Worker RPC messages or
+remote process environments.
 
 The smoke command is available from the Command Palette:
 
