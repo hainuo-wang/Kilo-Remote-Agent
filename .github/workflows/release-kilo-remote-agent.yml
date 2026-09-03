@@ -34,6 +34,9 @@ jobs:
       - name: Setup Bun and install dependencies
         uses: ./.github/actions/setup-bun
 
+      - name: Install VSIX packager
+        run: bun install --global @vscode/vsce
+
       - name: Setup Zig
         shell: bash
         run: |
