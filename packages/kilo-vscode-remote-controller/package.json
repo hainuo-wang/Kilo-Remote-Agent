@@ -1,13 +1,13 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "name": "kilo-code-remote-controller",
-  "displayName": "Kilo Code Remote Controller",
-  "description": "Local controller transport for the Kilo Code Remote Worker PoC.",
-  "version": "7.5.9",
-  "publisher": "kilocode",
+  "name": "kilo-remote-agent-controller",
+  "displayName": "Kilo Remote Agent Controller",
+  "description": "Local model, credential, session, and transport controller for Kilo Remote Agent.",
+  "version": "0.1.0",
+  "publisher": "hainuo-wang",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Kilo-Org/kilocode.git",
+    "url": "https://github.com/hainuo-wang/Kilo-Remote-Agent.git",
     "directory": "packages/kilo-vscode-remote-controller"
   },
   "license": "MIT",
@@ -25,7 +25,7 @@
   "main": "./dist/extension.js",
   "contributes": {
     "configuration": {
-      "title": "Kilo Code Remote Controller",
+      "title": "Kilo Remote Agent Controller",
       "properties": {
         "kilo-code.remoteController.cliPath": {
           "type": "string",

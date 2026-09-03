@@ -1,177 +1,177 @@
-<p align="center">
-  English | <a href="translations/README.zh.md">简体中文</a> | <a href="translations/README.zht.md">繁體中文</a> | <a href="translations/README.ko.md">한국어</a> | <a href="translations/README.de.md">Deutsch</a> | <a href="translations/README.es.md">Español</a> | <a href="translations/README.fr.md">Français</a> | <a href="translations/README.it.md">Italiano</a> | <a href="translations/README.da.md">Dansk</a> | <a href="translations/README.ja.md">日本語</a> | <a href="translations/README.pl.md">Polski</a> | <a href="translations/README.ru.md">Русский</a> | <a href="translations/README.bs.md">Bosanski</a> | <a href="translations/README.ar.md">العربية</a> | <a href="translations/README.no.md">Norsk</a> | <a href="translations/README.br.md">Português (Brasil)</a> | <a href="translations/README.th.md">ไทย</a> | <a href="translations/README.tr.md">Türkçe</a> | <a href="translations/README.uk.md">Українська</a> | <a href="translations/README.bn.md">বাংলা</a> | <a href="translations/README.gr.md">Ελληνικά</a> | <a href="translations/README.vi.md">Tiếng Việt</a>
-</p>
+# Kilo Remote Agent
 
-<p align="center">
-  <a href="https://kilo.ai"><img width="250" alt="Kilo Code logo" src="https://github.com/user-attachments/assets/bdb0c174-b9fd-40ad-a47b-f3aab9b54e8d" /></a>
-</p>
+Kilo Remote Agent 是一个面向 VS Code Remote SSH 的 Kilo Code 分支，实现类似 Cursor Remote SSH 的执行边界：
 
-<p align="center">The open source coding agent for building with AI in VS Code, JetBrains, or the CLI.</p>
+> Agent 的“脑子”在本机，文件、终端和进程的“手”在远程服务器。
 
-<p align="center">
-  <a href="https://marketplace.visualstudio.com/items?itemName=kilocode.Kilo-Code"><img src="https://raster.shields.io/badge/VS_Code_Marketplace-007ACC?style=flat&logo=visualstudiocode&logoColor=white" alt="VS Code Marketplace" height="20"></a>
-  <a href="https://www.npmjs.com/package/@kilocode/cli"><img alt="npm" src="https://raster.shields.io/npm/v/@kilocode/cli?style=flat" height="20" /></a>
-  <a href="https://x.com/kilocode"><img src="https://raster.shields.io/badge/kilocode-000000?style=flat&logo=x&logoColor=white" alt="X (Twitter)" height="20"></a>
-  <a href="https://blog.kilo.ai"><img src="https://raster.shields.io/badge/Blog-555?style=flat&logo=substack&logoColor=white" alt="Blog" height="20"></a>
-  <a href="https://kilo.ai/discord"><img src="https://raster.shields.io/badge/Join%20Discord-5865F2?style=flat&logo=discord&logoColor=white" alt="Discord" height="20"></a>
-  <a href="https://www.reddit.com/r/kilocode/"><img src="https://raster.shields.io/badge/Join%20r%2Fkilocode-D84315?style=flat&logo=reddit&logoColor=white" alt="Reddit" height="20"></a>
-</p>
+本项目基于 [Kilo Code](https://github.com/Kilo-Org/kilocode) 开发，但使用独立扩展 ID，不会被官方 Kilo Code 扩展升级覆盖。
 
-![Kilo-in-VS-Code-and-CLI](https://github.com/user-attachments/assets/0536ca59-ed81-4512-9e05-d186187a1b52)
+## 架构
 
----
-
-Kilo Code is an AI coding agent that meets you everywhere you work: [VS Code](https://kilo.ai/landing/vs-code), [JetBrains](https://kilo.ai/features/jetbrains-native), and the [CLI](https://kilo.ai/cli). It's open source with open pricing. You pick from 500+ models, switch between them mid-task, and pay the model provider's rate with zero markup. No API keys required to start.
-
-### Installation
-
-Pick where you want to run Kilo.
-
-<details open>
-<summary><strong>VS Code</strong></summary>
-
-<br>
-
-Install the [Kilo Code extension](vscode:extension/kilocode.kilo-code) directly, or grab it from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=kilocode.Kilo-Code). Create an account and you'll have access to 500+ models including GPT-5.5, Claude Opus 4.7, Claude Sonnet 4.6, and Gemini 3.1 Pro Preview, all at provider pricing.
-
-</details>
-
-<details open>
-<summary><strong>CLI</strong></summary>
-
-<br>
-
-```bash
-# npm
-npm install -g @kilocode/cli
-
-# curl
-curl -fsSL https://kilo.ai/cli/install | bash
-
-# pnpm
-pnpm add -g @kilocode/cli
-
-# bun
-bun add -g @kilocode/cli
-
-# Homebrew (macOS / Linux)
-brew install Kilo-Org/tap/kilo
-
-# Arch Linux (AUR)
-paru -S kilo-bin
+```text
+Windows / Linux Local
+┌─────────────────────────────────────┐
+│ Kilo Remote Agent Controller        │
+│ Agent loop / LLM Provider           │
+│ conversation and session state      │
+│ API key / model HTTP requests       │
+└──────────────────┬──────────────────┘
+                   │ VS Code Remote RPC
+                   ▼
+Linux Remote SSH
+┌─────────────────────────────────────┐
+│ Kilo Remote Agent + Remote Worker   │
+│ filesystem / edit / grep            │
+│ process / PTY / stdout / stderr     │
+│ git / Python / pytest / CUDA        │
+└─────────────────────────────────────┘
 ```
 
-Then run `kilo` in any project directory to start.
+通信复用 VS Code 已建立的 Remote SSH 通道，不创建额外 SSH 连接，不使用 `ssh -R`、SOCKS 或远程 HTTP 代理。
 
-</details>
+## 安全边界
 
-<details>
-<summary><strong>JetBrains</strong></summary>
+- LLM 请求只从本机 Controller 发出。
+- API Key 存放在本机 VS Code `SecretStorage`。
+- API Key 不写入 workspace、配置文件或远程环境。
+- Remote Worker 不接收 Provider 凭据。
+- 远程服务器可以继续保持完全无互联网。
+- 文件、Git、测试、Python、CUDA 和 PTY 命令均在远程 Linux 执行。
 
-<br>
+## 扩展组件
 
-Install the [Kilo Code plugin](https://plugins.jetbrains.com/plugin/28350-kilo-code) from the JetBrains Marketplace, or search "Kilo Code" in `Settings → Plugins` inside any JetBrains IDE.
+| 扩展 | ID | 安装位置 | 职责 |
+|---|---|---|---|
+| Kilo Remote Agent | `hainuo-wang.kilo-remote-agent` | Remote SSH Workspace Host | Kilo UI、远程工作区集成、Controller HTTP/SSE 客户端 |
+| Controller | `hainuo-wang.kilo-remote-agent-controller` | Local UI Extension Host | Agent、Provider、SecretStorage、本机 `kilo serve` |
+| Worker | `hainuo-wang.kilo-remote-agent-worker` | Remote SSH Workspace Host | 文件、搜索、进程、PTY、Git 和输出流 |
 
-</details>
+不需要再安装 VS Code Marketplace 中的官方 Kilo Code。由于两者仍共享部分 Kilo 命令名称，不建议同时启用官方扩展和 Kilo Remote Agent。
 
-<details>
-<summary><strong>Cloud Agent</strong></summary>
+## 安装
 
-<br>
+从 GitHub Releases 下载与你环境匹配的 VSIX。典型的 Windows 本机 + Linux Remote SSH 环境需要：
 
-Run Kilo from the web, no local machine needed, at [app.kilo.ai/cloud](https://app.kilo.ai/cloud).
-
-</details>
-
-<details>
-<summary><strong>Code Reviews</strong></summary>
-
-<br>
-
-Set up automated AI code reviews on your pull requests at [app.kilo.ai/code-reviews](https://app.kilo.ai/code-reviews).
-
-</details>
-
-<details>
-<summary><strong>KiloClaw</strong></summary>
-
-<br>
-
-Spin up your always-on AI agent at [app.kilo.ai/claw](https://app.kilo.ai/claw).
-
-</details>
-
-<details>
-<summary>Install the CLI from GitHub Releases (binaries)</summary>
-
-Download the latest binary from the [Releases page](https://github.com/Kilo-Org/kilocode/releases).
-
-| Platform | Asset |
-|---|---|
-| Windows (most PCs) | `kilo-windows-x64.zip` |
-| macOS (Apple Silicon) | `kilo-darwin-arm64.zip` |
-| macOS (Intel) | `kilo-darwin-x64.zip` |
-| Linux x64 | `kilo-linux-x64.tar.gz` |
-| Linux ARM | `kilo-linux-arm64.tar.gz` |
-
-Notes: `x64-baseline` is a compatibility build for older CPUs without AVX. `musl` is the statically linked build for Alpine or minimal Docker images without glibc. `kilo-vscode-*.vsix` is the VS Code extension package, not the CLI. `Source code` archives are for building from source.
-
-</details>
-
-### Agents
-
-Kilo ships with specialized agents you switch between depending on the task. You can also build your own custom agents.
-
-- **Code** - The default. Implements and edits code from natural language.
-- **Plan** - Designs architecture and writes implementation plans before any code gets written.
-- **Ask** - Answers questions about your codebase without touching any files.
-- **Debug** - Troubleshoots and traces issues.
-- **Review** - Reviews your changes and surfaces issues across performance, security, style, and test coverage.
-
-Learn more about [agents and custom agents](https://kilo.ai/docs/code-with-ai/agents/using-agents).
-
-### What it does
-
-- **Code generation** from natural language, across multiple files.
-- **Inline autocomplete** with ghost-text suggestions and tab to accept.
-- **Self-checking** so the agent reviews and corrects its own work.
-- **Terminal and browser control** to run commands and automate the web.
-- **MCP marketplace** to find and wire up MCP servers that extend what the agent can do.
-- **500+ models** with mid-task switching, so you can match latency, cost, and reasoning to the job.
-
-### Autonomous Mode (CI/CD)
-
-Run `kilo run` with `--auto` for fully autonomous operation with no prompts, built for CI/CD pipelines:
-
-```bash
-kilo run --auto "run tests and fix any failures"
+```text
+kilo-remote-agent-controller-win32-x64.vsix
+kilo-remote-agent-linux-x64.vsix
+kilo-remote-agent-worker-linux-x64.vsix
 ```
 
-`--auto` disables all permission prompts and lets the agent execute any action without confirmation. Only use it in trusted environments.
+### 手动安装
 
-### Documentation
+1. 在本机 VS Code 中安装 Controller VSIX。
+2. 连接 Remote SSH。
+3. 在扩展页面使用 `Install in SSH: <host>`，安装 Agent 和 Worker 两个 Linux VSIX。
+4. 在用户设置中启用：
 
-For configuration and everything else, [head over to the docs](https://kilo.ai/docs).
+```json
+{
+  "kilo-code.new.experimental.cursorLikeRemote": true,
+  "kilo-code.new.experimental.duckcoding.baseURL": "https://api.duckcoding.ai/v1",
+  "kilo-code.new.experimental.duckcoding.model": "gpt-5.6-sol",
+  "kilo-code.new.experimental.duckcoding.api": "responses"
+}
+```
 
-### Contributing
+5. 执行 `Kilo: Configure Local DuckCoding API Key`。
+6. 输入 API Key；它只保存到本机 SecretStorage。
+7. 执行 `Developer: Reload Window`。
 
-Contributions are welcome from developers, writers, and everyone in between. Start with the [Contributing Guide](/CONTRIBUTING.md) for environment setup, coding standards, and how to open a pull request. See [RELEASING.md](RELEASING.md) for the VS Code extension and CLI release process, and [packages/kilo-jetbrains/RELEASING.md](packages/kilo-jetbrains/RELEASING.md) for the JetBrains plugin.
+如果本机访问 DuckCoding 需要代理，可增加：
 
-Please review our [Code of Conduct](/CODE_OF_CONDUCT.md) before getting involved.
+```json
+{
+  "kilo-code.remoteController.proxy": "http://127.0.0.1:7897"
+}
+```
 
-### License
+该代理只注入本机 Controller，不会传给 Remote SSH 或 Remote Worker。
 
-MIT. You're free to use, modify, and distribute this code, including commercially, as long as you keep the attribution and license notices. See [License](/LICENSE).
+### 一次安装三个组件
 
-### FAQ
+已经连接过 Remote SSH 后，可以使用 VS Code CLI：
 
-<details>
-<summary>Where did Kilo CLI come from?</summary>
+```powershell
+code --install-extension .\kilo-remote-agent-controller-win32-x64.vsix --force
+code --remote ssh-remote+YOUR_HOST --install-extension .\kilo-remote-agent-linux-x64.vsix --force
+code --remote ssh-remote+YOUR_HOST --install-extension .\kilo-remote-agent-worker-linux-x64.vsix --force
+```
 
-Kilo CLI is a fork of [OpenCode](https://github.com/anomalyco/opencode), enhanced to work within the Kilo agentic engineering platform.
+`YOUR_HOST` 是 SSH config 中的 Host。该方式仍使用 VS Code Remote SSH，不会绕过 MFA、QR、密码或 OTP。
 
-</details>
+## 验证
 
----
+先执行：
 
-**Join the community** [Discord](https://kilo.ai/discord) | [X](https://x.com/kilocode) | [Reddit](https://www.reddit.com/r/kilocode/)
+```text
+Kilo: Run Remote Worker Smoke Test
+```
+
+再让 Agent 执行：
+
+```text
+运行 pwd、uname -a、python --version、git diff，并完整显示 stdout 和 stderr。
+```
+
+应满足：
+
+- 命令运行在远程 Linux workspace。
+- stdout 和 stderr 完整返回。
+- 远程环境中没有 DuckCoding API Key。
+- Remote SSH 断开时本机 Agent 不崩溃，重连后 Worker 可以恢复。
+
+## 当前范围
+
+PoC 已覆盖文件读取、写入、编辑、目录列表、glob、grep、命令执行、stdout/stderr streaming、PTY、取消、超时和 Remote SSH 断开处理。
+
+索引、LSP、诊断、MCP placement 和更多工具仍需要逐项确认 Local/Remote 执行边界。
+
+## 上游升级
+
+Kilo Remote Agent 尽量不修改 Kilo/OpenCode 的核心 Agent 和 Provider：
+
+- Remote 协议集中在 `packages/kilo-remote-protocol/`。
+- Local Controller 位于 `packages/kilo-vscode-remote-controller/`。
+- Remote Worker 位于 `packages/kilo-vscode-remote-worker/`。
+- CLI Worker 位于 `packages/opencode/src/kilocode/remote-worker/`。
+- 对共享 OpenCode 文件的修改保持最小，并保留项目现有的 `kilocode_change` 标记。
+
+升级上游后运行：
+
+```bash
+bun turbo typecheck
+cd packages/opencode && bun test ./test/kilocode/remote-worker.test.ts
+cd ../kilo-vscode-remote-controller && bun test test
+```
+
+## 构建
+
+```bash
+bun install
+```
+
+本地开发可分别在以下目录运行 `bun run package`：
+
+```text
+packages/kilo-vscode
+packages/kilo-vscode-remote-controller
+packages/kilo-vscode-remote-worker
+```
+
+Controller 和 Worker VSIX 必须包含与目标平台匹配的 Kilo CLI。
+
+正式版本由 GitHub Actions 在推送 `v*` 标签后构建。`v0.1.0` 会提供：
+
+```text
+kilo-remote-agent-linux-x64.vsix
+kilo-remote-agent-controller-win32-x64.vsix
+kilo-remote-agent-controller-linux-x64.vsix
+kilo-remote-agent-worker-linux-x64.vsix
+```
+
+发布流程只创建 GitHub Release，不会向 VS Code Marketplace 发布，也不会调用上游 Kilo Code 的官方发布工作流。
+
+## License
+
+MIT。Kilo Remote Agent 基于 Kilo Code 和 OpenCode，保留原项目许可证与归属。

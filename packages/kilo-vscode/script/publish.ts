@@ -29,7 +29,7 @@ const targets = [
 
 const vsixFiles: string[] = []
 for (const target of targets) {
-  const vsixPath = join(outDir, `kilo-vscode-${target}.vsix`)
+  const vsixPath = join(outDir, `kilo-remote-agent-${target}.vsix`)
   if (!existsSync(vsixPath)) {
     throw new Error(`VSIX file not found: ${vsixPath}`)
   }
@@ -41,7 +41,7 @@ console.log(`\nFound ${vsixFiles.length} VSIX files`)
 const flag = prerelease ? ["--pre-release"] : []
 
 for (const target of targets) {
-  const vsixPath = join(outDir, `kilo-vscode-${target}.vsix`)
+  const vsixPath = join(outDir, `kilo-remote-agent-${target}.vsix`)
   console.log(`\n🚀 Publishing ${target} to VS Code Marketplace${prerelease ? " (pre-release)" : ""}...`)
   await $`vsce publish ${flag} --packagePath ${vsixPath}`
   console.log(`  ✅ Published ${target} to VS Code Marketplace`)

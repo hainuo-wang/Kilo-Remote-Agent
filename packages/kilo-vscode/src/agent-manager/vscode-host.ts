@@ -317,7 +317,7 @@ export class VscodeHost implements Host {
   }
 
   extensionKeybindings(): Array<{ command: string; key?: string; mac?: string; when?: string }> {
-    const ext = vscode.extensions.getExtension("kilocode.kilo-code")
+    const ext = vscode.extensions.getExtension("hainuo-wang.kilo-remote-agent")
     return ext?.packageJSON?.contributes?.keybindings ?? []
   }
 

@@ -1,4 +1,4 @@
-# Kilo Code Remote Worker
+# Kilo Remote Agent Worker
 
 This package is the workspace-side companion for the Cursor-like Remote SSH
 prototype. It must be installed in the VS Code Remote SSH extension host, not

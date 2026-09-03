@@ -1,4 +1,4 @@
-# Kilo Code Remote Controller
+# Kilo Remote Agent Controller
 
 This package is the local-side companion for the Cursor-like Remote SSH
 prototype. It runs in the local VS Code UI extension host while the main Kilo

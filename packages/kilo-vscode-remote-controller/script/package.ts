@@ -44,7 +44,7 @@ console.log(`Copied ${source} -> ${destination}`)
 if (process.argv.includes("--package")) {
   const outputDirectory = path.join(packageDirectory, "out")
   await mkdir(outputDirectory, { recursive: true })
-  const output = path.join(outputDirectory, `kilo-code-remote-controller-${target}.vsix`)
+  const output = path.join(outputDirectory, `kilo-remote-agent-controller-${target}.vsix`)
   await $`bunx vsce package --no-dependencies --skip-license --target ${target} -o ${output}`.cwd(packageDirectory)
   console.log(`Created ${output}`)
 }

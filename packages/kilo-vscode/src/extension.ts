@@ -581,7 +581,7 @@ export async function activate(context: vscode.ExtensionContext) {
     ),
   )
 
-  // Register URI handler for extension deep links (vscode://kilocode.kilo-code/kilocode/...)
+  // Register URI handler for extension deep links (vscode://hainuo-wang.kilo-remote-agent/kilocode/...)
   context.subscriptions.push(
     vscode.window.registerUriHandler({
       async handleUri(uri: vscode.Uri) {

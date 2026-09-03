@@ -22,7 +22,12 @@ function manifest(packageName: string) {
 
 describe("Cursor-like Remote SSH extension placement", () => {
   test("places the main extension in the workspace host when remote exists", () => {
-    expect(manifest("packages/kilo-vscode").extensionKind).toEqual(["workspace"])
+    const main = manifest("packages/kilo-vscode") as { name?: string; publisher?: string; extensionKind?: string[] }
+    expect(main).toMatchObject({
+      name: "kilo-remote-agent",
+      publisher: "hainuo-wang",
+      extensionKind: ["workspace"],
+    })
   })
 
   test("places the controller locally and the worker remotely", () => {
@@ -47,8 +52,8 @@ describe("Cursor-like Remote SSH extension placement", () => {
       default: false,
       scope: "application",
     })
-    expect(main.extensionDependencies ?? []).not.toContain("kilocode.kilo-code-remote-controller")
-    expect(main.extensionDependencies ?? []).not.toContain("kilocode.kilo-code-remote-worker")
+    expect(main.extensionDependencies ?? []).not.toContain("hainuo-wang.kilo-remote-agent-controller")
+    expect(main.extensionDependencies ?? []).not.toContain("hainuo-wang.kilo-remote-agent-worker")
   })
 
   test("activates both companions after the remote window is ready", () => {

@@ -33,7 +33,7 @@ await chmod(destination, 0o755)
 console.log(`Copied ${source} -> ${destination}`)
 
 if (process.argv.includes("--package")) {
-  const output = join(packageDirectory, "out", `kilo-code-remote-worker-${target}.vsix`)
+  const output = join(packageDirectory, "out", `kilo-remote-agent-worker-${target}.vsix`)
   await mkdir(dirname(output), { recursive: true })
   await $`bunx vsce package --no-dependencies --skip-license --target ${target} -o ${output}`.cwd(packageDirectory)
   console.log(`Created ${output}`)

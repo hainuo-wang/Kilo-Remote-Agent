@@ -82,7 +82,7 @@ export class ControllerBridge implements vscode.Disposable {
     this.sensitiveValues.add(this.token)
     const configuredCli = vscode.workspace.getConfiguration("kilo-code").get<string>("remoteController.cliPath")?.trim()
     const bundledCli = path.join(context.extensionPath, "bin", process.platform === "win32" ? "kilo.exe" : "kilo")
-    const mainExtension = vscode.extensions.getExtension("kilocode.kilo-code")
+    const mainExtension = vscode.extensions.getExtension("hainuo-wang.kilo-remote-agent")
     const fallbackCli =
       mainExtension?.extensionPath &&
       path.join(mainExtension.extensionPath, "bin", process.platform === "win32" ? "kilo.exe" : "kilo")

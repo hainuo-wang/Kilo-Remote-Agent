@@ -80,8 +80,8 @@ function resolveCliPath(context: vscode.ExtensionContext) {
   if (process.env.KILO_REMOTE_WORKER_CLI) return process.env.KILO_REMOTE_WORKER_CLI
   const candidates = [
     path.join(context.extensionPath, "bin", "kilo"),
-    vscode.extensions.getExtension("kilocode.kilo-code")?.extensionPath
-      ? path.join(vscode.extensions.getExtension("kilocode.kilo-code")!.extensionPath, "bin", "kilo")
+    vscode.extensions.getExtension("hainuo-wang.kilo-remote-agent")?.extensionPath
+      ? path.join(vscode.extensions.getExtension("hainuo-wang.kilo-remote-agent")!.extensionPath, "bin", "kilo")
       : undefined,
   ]
   return candidates.find((candidate): candidate is string => Boolean(candidate && existsSync(candidate))) ?? "kilo"

@@ -29,7 +29,7 @@ if (!existsSync(cliDistDir)) {
   throw new Error(`CLI dist directory not found: ${cliDistDir}`)
 }
 
-const targets = [
+const allTargets = [
   { target: "linux-x64", cliDir: "@kilocode/cli-linux-x64", binary: "kilo" },
   { target: "linux-arm64", cliDir: "@kilocode/cli-linux-arm64", binary: "kilo" },
   { target: "alpine-x64", cliDir: "@kilocode/cli-linux-x64-musl", binary: "kilo" },
@@ -39,6 +39,16 @@ const targets = [
   { target: "win32-x64", cliDir: "@kilocode/cli-windows-x64", binary: "kilo.exe" },
   { target: "win32-arm64", cliDir: "@kilocode/cli-windows-arm64", binary: "kilo.exe" },
 ]
+const requestedTargets = process.env.KILO_VSCODE_TARGETS?.split(",")
+  .map((target) => target.trim())
+  .filter(Boolean)
+const targets = requestedTargets?.length
+  ? allTargets.filter((config) => requestedTargets.includes(config.target))
+  : allTargets
+
+if (targets.length === 0) {
+  throw new Error(`No VSIX targets selected. Requested: ${requestedTargets?.join(", ") ?? "none"}`)
+}
 
 const binDir = join(import.meta.dir, "..", "bin")
 const distDir = join(import.meta.dir, "..", "dist")
@@ -94,7 +104,7 @@ for (const config of targets) {
   await ensureFfmpegForTarget(config.target, binDir)
 
   console.log(`  📦 Packaging .vsix for ${config.target}${prerelease ? " (pre-release)" : ""}...`)
-  const vsixPath = join(outDir, `kilo-vscode-${config.target}.vsix`)
+  const vsixPath = join(outDir, `kilo-remote-agent-${config.target}.vsix`)
   const args = ["--no-dependencies", "--skip-license", "--target", config.target, "-o", vsixPath]
   if (prerelease) args.push("--pre-release")
   await $`vsce package ${args}`.env({

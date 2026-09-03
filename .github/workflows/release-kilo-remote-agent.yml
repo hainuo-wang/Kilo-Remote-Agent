@@ -1,0 +1,109 @@
+name: release-kilo-remote-agent
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-kilo-remote-agent-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.repository == 'hainuo-wang/Kilo-Remote-Agent'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve release version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$ ]]
+          echo "value=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Bun and install dependencies
+        uses: ./.github/actions/setup-bun
+
+      - name: Setup Zig
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 \
+            https://ziglang.org/download/0.14.0/zig-linux-x86_64-0.14.0.tar.xz \
+            --output "$RUNNER_TEMP/zig.tar.xz"
+          echo "473ec26806133cf4d1918caf1a410f8403a13d979726a9045b421b685031a982  $RUNNER_TEMP/zig.tar.xz" \
+            | sha256sum --check --status
+          tar -xJf "$RUNNER_TEMP/zig.tar.xz" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/zig-linux-x86_64-0.14.0" >> "$GITHUB_PATH"
+
+      - name: Build CLI runtime targets
+        env:
+          KILO_VERSION: ${{ steps.version.outputs.value }}
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: bun packages/opencode/script/build.ts
+
+      - name: Build main remote workspace extension
+        working-directory: packages/kilo-vscode
+        env:
+          KILO_VERSION: ${{ steps.version.outputs.value }}
+          KILO_VSCODE_TARGETS: linux-x64
+          CLI_DIST_DIR: ../opencode/dist
+          GH_REPO: ${{ github.repository }}
+        run: bun script/build.ts
+
+      - name: Build local Windows controller extension
+        working-directory: packages/kilo-vscode-remote-controller
+        env:
+          KILO_REMOTE_CONTROLLER_TARGET: win32-x64
+        run: bun run package
+
+      - name: Build local Linux controller extension
+        working-directory: packages/kilo-vscode-remote-controller
+        env:
+          KILO_REMOTE_CONTROLLER_TARGET: linux-x64
+        run: bun run package
+
+      - name: Build remote Linux worker extension
+        working-directory: packages/kilo-vscode-remote-worker
+        env:
+          KILO_REMOTE_WORKER_TARGET: linux-x64
+        run: bun run package
+
+      - name: Verify extension IDs and secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          ! git grep -n -I -E 'DUCKCODING_API_KEY=sk-|Authorization: Bearer sk-|mioffice\\.apiKey.{0,80}sk-' -- ':!*.lock'
+          for package in \
+            packages/kilo-vscode/out/kilo-remote-agent-linux-x64.vsix \
+            packages/kilo-vscode-remote-controller/out/kilo-remote-agent-controller-win32-x64.vsix \
+            packages/kilo-vscode-remote-controller/out/kilo-remote-agent-controller-linux-x64.vsix \
+            packages/kilo-vscode-remote-worker/out/kilo-remote-agent-worker-linux-x64.vsix
+          do
+            test -f "$package"
+            unzip -p "$package" extension/package.json \
+              | grep -E '"(name|publisher)": "(kilo-remote-agent|hainuo-wang)' >/dev/null
+          done
+
+      - name: Create GitHub release and upload VSIX files
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --generate-notes \
+            packages/kilo-vscode/out/kilo-remote-agent-linux-x64.vsix \
+            packages/kilo-vscode-remote-controller/out/kilo-remote-agent-controller-win32-x64.vsix \
+            packages/kilo-vscode-remote-controller/out/kilo-remote-agent-controller-linux-x64.vsix \
+            packages/kilo-vscode-remote-worker/out/kilo-remote-agent-worker-linux-x64.vsix
