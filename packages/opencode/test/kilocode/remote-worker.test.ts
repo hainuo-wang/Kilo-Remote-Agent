@@ -217,9 +217,11 @@ describe("remote worker", () => {
     )
     await worker.waitFor((message) => message.type === "response" && message.requestId === "timeout")
     const messages = await Promise.race([
-      worker.waitFor(
-        (message) => message.type === "event" && message.streamId === "timeout:process" && message.event === "error",
-      ).then(() => worker.messages),
+      worker
+        .waitFor(
+          (message) => message.type === "event" && message.streamId === "timeout:process" && message.event === "error",
+        )
+        .then(() => worker.messages),
       new Promise<never>((_, reject) => setTimeout(() => reject(new Error("remote timeout was not emitted")), 5_000)),
     ])
     worker.end()
@@ -331,6 +333,40 @@ describe("remote worker", () => {
     expect(output).toContain("ready")
     expect(output).toContain("got:hello")
     expect(messages.find((message) => message.type === "event" && message.event === "exit")).toBeDefined()
+  })
+
+  test("starts an interactive shell when no PTY command is supplied", async () => {
+    const root = await workspace()
+    const worker = spawnWorker(root)
+    worker.write(
+      request("shell", "pty.start", {
+        rootId: "workspace",
+        cwd: ".",
+        cols: 100,
+        rows: 24,
+      }),
+    )
+    await worker.waitFor((message) => message.type === "response" && message.requestId === "shell")
+    const accepted = response(worker.messages, "shell").result as { streamId: string }
+    worker.write(
+      request("input", "pty.input", {
+        streamId: accepted.streamId,
+        data: Buffer.from("printf 'interactive-shell\\n'; exit\n").toString("base64"),
+      }),
+    )
+    await worker.waitFor((message) => message.type === "response" && message.requestId === "input")
+    await worker.waitFor(
+      (message) => message.type === "event" && message.streamId === accepted.streamId && message.event === "exit",
+    )
+    worker.end()
+    const messages = await worker.done
+    const output = bytes(
+      messages.filter(
+        (message): message is RpcEvent => message.type === "event" && message.streamId === accepted.streamId,
+      ),
+      "stdout",
+    ).toString("utf8")
+    expect(output).toContain("interactive-shell")
   })
 })
 

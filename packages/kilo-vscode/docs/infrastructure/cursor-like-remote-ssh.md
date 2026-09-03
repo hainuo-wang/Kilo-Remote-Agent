@@ -74,12 +74,13 @@ path and are not treated as Remote SSH-safe services.
 
 The remote tool overlay currently routes `read`, `write`, `edit`, `glob`,
 `grep`, and `bash`. The worker protocol additionally exposes `stat`, process
-streaming, and PTY operations. The first PoC validates process streaming
-through the Agent tool path; the existing Agent Manager terminal-tab UI still
-uses its legacy backend PTY WebSocket and is not yet enabled as a Remote
-Worker terminal. Git, indexing, LSP, diagnostics, MCP placement, and other
-workspace-sensitive services remain follow-up work and must not be treated as
-remote-safe until explicitly routed.
+streaming, and PTY operations. Agent Manager's embedded terminal tabs use the
+same Remote Worker PTY path in the experimental SSH mode, with a local
+authenticated WebSocket bridge forwarding terminal bytes to the webview.
+Ordinary local workspaces keep the existing backend PTY WebSocket. Git,
+indexing, LSP, diagnostics, MCP placement, and other workspace-sensitive
+services remain follow-up work and must not be treated as remote-safe until
+explicitly routed.
 
 ## Packaging
 

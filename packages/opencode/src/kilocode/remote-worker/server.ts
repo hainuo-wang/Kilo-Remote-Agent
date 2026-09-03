@@ -517,8 +517,8 @@ async function startPtyRequest(
 ) {
   const input = objectParams(request.params)
   assertRoot(input)
-  if (typeof input.command !== "string" || input.command.length === 0) {
-    throw new WorkerError("INVALID_REQUEST", "pty.start requires command")
+  if (input.command !== undefined && typeof input.command !== "string") {
+    throw new WorkerError("INVALID_REQUEST", "pty.start command must be a string")
   }
 
   const cwd = await safePath(context.root, input.cwd ?? ".")
@@ -528,7 +528,7 @@ async function startPtyRequest(
   if (context.cancelled.delete(request.requestId)) {
     throw new WorkerError("CANCELLED", "pty.start was cancelled before it started")
   }
-  const args = Shell.args(shell, input.command, cwd)
+  const args = input.command ? Shell.args(shell, input.command, cwd) : []
   const { spawn } = await import("@opencode-ai/core/pty/driver")
   const proc = spawn(shell, args, {
     name: "xterm-256color",

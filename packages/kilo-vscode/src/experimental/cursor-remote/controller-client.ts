@@ -144,6 +144,8 @@ export function createCursorRemoteFetch(context: vscode.ExtensionContext): Curso
   }
 }
 
+export { createCursorRemotePty, type CursorRemotePty } from "./pty-client"
+
 function isSshRemote(): boolean {
   return vscode.env.remoteName?.startsWith("ssh-remote") ?? false
 }

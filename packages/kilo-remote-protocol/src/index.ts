@@ -7,6 +7,9 @@ export const REMOTE_COMMANDS = {
   controllerHttp: "kilo-code.new.internal.controller.http",
   controllerHttpCancel: "kilo-code.new.internal.controller.http.cancel",
   controllerHttpEvent: "kilo-code.new.internal.controller.http.event",
+  controllerPtyCreate: "kilo-code.new.internal.controller.pty.create",
+  controllerPtyResize: "kilo-code.new.internal.controller.pty.resize",
+  controllerPtyClose: "kilo-code.new.internal.controller.pty.close",
 } as const
 
 const CONTROLLER_CREDENTIAL_ENVIRONMENT_KEY = /^(?:MIOFFICE|OPENAI|ANTHROPIC)(?:_|$)/i
@@ -110,6 +113,30 @@ export type ControllerHttpEvent =
       seq?: number
       error: { message: string }
     }
+
+export type ControllerPtyCreateRequest = {
+  cwd: string
+  cols?: number
+  rows?: number
+  shell?: string
+}
+
+export type ControllerPtyCreateResponse = {
+  streamId: string
+  wsUrl: string
+  pid: number
+  cwd: string
+}
+
+export type ControllerPtyResizeRequest = {
+  streamId: string
+  cols: number
+  rows: number
+}
+
+export type ControllerPtyCloseRequest = {
+  streamId: string
+}
 
 export type HelloResult = {
   protocol: {

@@ -17,6 +17,8 @@
 import type { KiloClient } from "@kilocode/sdk/v2/client"
 import type { AgentManagerInMessage, AgentManagerOutMessage, TerminalFont, TerminalPlacement } from "./types"
 import { TerminalManager } from "./terminal-manager"
+import { RemoteTerminalManager } from "./remote-terminal-manager"
+import type { CursorRemotePty } from "../experimental/cursor-remote/controller-client"
 
 interface ServerConfig {
   baseUrl: string
@@ -44,6 +46,7 @@ export interface TerminalRoutingDeps {
   post(message: AgentManagerOutMessage): void
   /** Return the current terminal font settings. */
   getTerminalFont(): TerminalFont
+  getRemotePty?(): CursorRemotePty | undefined
 }
 
 /** True iff the message belongs to the terminal-tab subsystem. */
@@ -62,7 +65,7 @@ function isTerminalMessage(
 }
 
 export class TerminalRouter {
-  private manager: TerminalManager
+  private manager: TerminalManager | RemoteTerminalManager
   /** Ordinals reserved by in-flight creates, per context — prevents two
    *  concurrent creates from grabbing the same "Terminal N" title. */
   private readonly reserved = new Map<string, Set<number>>()
@@ -72,7 +75,9 @@ export class TerminalRouter {
     this.manager = this.createManager()
   }
 
-  private createManager(): TerminalManager {
+  private createManager(): TerminalManager | RemoteTerminalManager {
+    const remotePty = this.deps.getRemotePty?.()
+    if (remotePty) return new RemoteTerminalManager(remotePty, this.deps.log)
     return new TerminalManager({
       getClient: () => this.deps.getClient(),
       buildWsUrl: (ptyID, cwd) => this.buildWsUrl(ptyID, cwd),
@@ -174,9 +179,10 @@ export class TerminalRouter {
     const ordinal = this.reserveOrdinal(worktreeId)
     const title = `Terminal ${ordinal}`
     try {
-      // Join the shared backend connection instead of racing its synchronous
-      // client accessor when this is the first Kilo action in the window.
-      await this.deps.getClientAsync()
+      // The legacy manager needs the shared backend connection. The Remote
+      // Worker manager talks to the controller directly and must not start or
+      // await a backend on the remote extension host.
+      if (!this.deps.getRemotePty?.()) await this.deps.getClientAsync()
       const created = await manager.create({ terminalId: createId, worktreeId, cwd, title, cols, rows })
       if (generation !== this.generation) {
         await manager.close(created.terminalId)

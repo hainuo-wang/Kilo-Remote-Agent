@@ -14,15 +14,9 @@
  */
 
 import type { KiloClient } from "@kilocode/sdk/v2/client"
-import path from "node:path"
-import { block } from "./pty-cleanup"
+import { TerminalBookkeeping, type TerminalEntry } from "./terminal-bookkeeping"
 
 const env = { KILO_UNICODE_LOGO: "0", KILO_TERMINAL_ACTIVITY: "1" }
-
-function key(directory: string) {
-  const value = path.resolve(directory)
-  return process.platform === "win32" ? value.toLowerCase() : value
-}
 
 /**
  * Everything the manager needs from the surrounding AgentManagerProvider.
@@ -47,20 +41,14 @@ export interface TerminalManagerDeps {
  * uses the `directory` query param to route requests to the right
  * per-instance PTY map — see `packages/opencode/src/server/instance/middleware.ts`).
  */
-interface Entry {
+interface Entry extends TerminalEntry {
   terminalId: string
   ptyID: string
-  worktreeId: string | null
-  cwd: string
-  title: string
 }
 
 export class TerminalManager {
-  private readonly entries = new Map<string, Entry>()
+  private readonly state = new TerminalBookkeeping<Entry>()
   private readonly restarts = new Map<string, Promise<void>>()
-  private readonly pending = new Map<string, { cols: number; rows: number }>()
-  private readonly creates = new Map<string, Set<Promise<unknown>>>()
-  private readonly blocked = new Map<string, number>()
 
   constructor(private readonly deps: TerminalManagerDeps) {}
 
@@ -80,30 +68,15 @@ export class TerminalManager {
     cols?: number
     rows?: number
   }): Promise<{ terminalId: string; worktreeId: string | null; title: string; wsUrl: string }> {
-    const directory = key(params.cwd)
-    if (this.blocked.has(directory)) throw new Error(`PTY directory is being removed: ${params.cwd}`)
-    const task = this.createImpl(params)
-    const creates = this.creates.get(directory) ?? new Set<Promise<unknown>>()
-    if (!this.creates.has(directory)) this.creates.set(directory, creates)
-    creates.add(task)
-    try {
-      return await task
-    } finally {
-      creates.delete(task)
-      if (creates.size === 0) this.creates.delete(directory)
-    }
+    return this.state.create(params, () => this.createImpl(params))
   }
 
   async blockDirectory(directory: string) {
-    const target = key(directory)
-    return block(target, this.blocked, this.creates.get(target))
+    return this.state.blockDirectory(directory)
   }
 
   async closeDirectory(directory: string): Promise<void> {
-    const target = key(directory)
-    const entries = [...this.entries.values()].filter((entry) => key(entry.cwd) === target)
-    const results = await Promise.all(entries.map((entry) => this.close(entry.terminalId)))
-    if (results.some((result) => !result)) throw new Error(`Failed to close terminals in ${directory}`)
+    return this.state.closeDirectory(directory, (terminalId) => this.close(terminalId))
   }
 
   private async createImpl(params: {
@@ -114,10 +87,7 @@ export class TerminalManager {
     cols?: number
     rows?: number
   }): Promise<{ terminalId: string; worktreeId: string | null; title: string; wsUrl: string }> {
-    const initial =
-      this.pending.get(params.terminalId) ??
-      (params.cols !== undefined && params.rows !== undefined ? { cols: params.cols, rows: params.rows } : undefined)
-    this.pending.delete(params.terminalId)
+    const initial = this.state.initialSize(params.terminalId, params.cols, params.rows)
 
     const client = this.deps.getClient()
     const { data, error } = await client.pty.create({
@@ -140,21 +110,19 @@ export class TerminalManager {
       cwd: params.cwd,
       title: data.title ?? params.title,
     }
-    this.entries.set(params.terminalId, entry)
+    this.state.entries.set(params.terminalId, entry)
     // If a resize arrived while pty.create was in flight that differed from `initial`, apply it now.
-    const latest = this.pending.get(params.terminalId)
-    if (latest && (latest.cols !== initial?.cols || latest.rows !== initial?.rows)) {
-      this.pending.delete(params.terminalId)
+    await this.state.applyLatestResize(params.terminalId, initial, async (size) => {
       const { error: resizeErr } = await client.pty.update({
         directory: entry.cwd,
         ptyID: entry.ptyID,
-        size: latest,
+        size,
       })
       if (resizeErr) {
         const err = resizeErr instanceof Error ? resizeErr.message : String(resizeErr)
         this.deps.log(`Initial terminal resize failed (${params.terminalId}): ${err}`)
       }
-    }
+    })
     const wsUrl = this.deps.buildWsUrl(entry.ptyID, entry.cwd)
     this.deps.log(`Terminal created: ${params.terminalId} -> pty ${entry.ptyID} cwd=${entry.cwd}`)
     return { terminalId: params.terminalId, worktreeId: entry.worktreeId, title: entry.title, wsUrl }
@@ -168,32 +136,20 @@ export class TerminalManager {
    * URL is returned.
    */
   async resize(terminalId: string, cols: number, rows: number): Promise<void> {
-    const entry = this.entries.get(terminalId)
-    if (!entry) {
-      this.pending.set(terminalId, { cols, rows })
-      return
-    }
-    this.pending.delete(terminalId)
-    const client = this.deps.getClient()
-    const { error } = await client.pty.update({
-      directory: entry.cwd,
-      ptyID: entry.ptyID,
-      size: { cols, rows },
+    await this.state.resize(terminalId, { cols, rows }, async (entry, size) => {
+      const client = this.deps.getClient()
+      const { error } = await client.pty.update({ directory: entry.cwd, ptyID: entry.ptyID, size })
+      if (error)
+        this.deps.log(
+          `Terminal resize failed (${terminalId}): ${error instanceof Error ? error.message : String(error)}`,
+        )
     })
-    if (error) {
-      const err = error instanceof Error ? error.message : String(error)
-      this.deps.log(`Terminal resize failed (${terminalId}): ${err}`)
-    }
   }
 
   /** Titles of every live terminal in a context — used by the router to
    *  pick the lowest free "Terminal N" ordinal. */
   titles(worktreeId: string | null): string[] {
-    const out: string[] = []
-    for (const entry of this.entries.values()) {
-      if (entry.worktreeId === worktreeId) out.push(entry.title)
-    }
-    return out
+    return this.state.titles(worktreeId)
   }
 
   /** Kill a single terminal. Keep bookkeeping when the backend rejects cleanup so the UI can retry.
@@ -202,8 +158,8 @@ export class TerminalManager {
    *  failed delete would be silently logged as a successful close and
    *  the server-side PTY would linger until `kilo serve` exits. */
   async close(terminalId: string): Promise<boolean> {
-    this.pending.delete(terminalId)
-    const entry = this.entries.get(terminalId)
+    this.state.pending.delete(terminalId)
+    const entry = this.state.entries.get(terminalId)
     if (!entry) return true
     try {
       const client = this.deps.getClient()
@@ -213,7 +169,7 @@ export class TerminalManager {
         this.deps.log(`Terminal close failed (${terminalId}): ${msg} — PTY may linger until kilo serve exits`)
         return false
       }
-      this.entries.delete(terminalId)
+      this.state.entries.delete(terminalId)
       this.deps.log(`Terminal closed: ${terminalId} (pty ${entry.ptyID})`)
       return true
     } catch (err) {
@@ -227,12 +183,12 @@ export class TerminalManager {
   }
 
   async restart(terminalId: string, cols?: number, rows?: number): Promise<string | undefined> {
-    const entry = this.entries.get(terminalId)
+    const entry = this.state.entries.get(terminalId)
     if (!entry) return
     const prior = this.restarts.get(terminalId)
     if (prior) {
       await prior
-      const current = this.entries.get(terminalId)
+      const current = this.state.entries.get(terminalId)
       return current ? this.deps.buildWsUrl(current.ptyID, current.cwd) : undefined
     }
     const task = this.restartEntry(entry, cols, rows)
@@ -240,7 +196,7 @@ export class TerminalManager {
     await task.finally(() => {
       if (this.restarts.get(terminalId) === task) this.restarts.delete(terminalId)
     })
-    const current = this.entries.get(terminalId)
+    const current = this.state.entries.get(terminalId)
     return current ? this.deps.buildWsUrl(current.ptyID, current.cwd) : undefined
   }
 
@@ -266,10 +222,10 @@ export class TerminalManager {
    * is sampled mid-shutdown.
    */
   async dispose(): Promise<void> {
-    this.pending.clear()
-    const snapshot = [...this.entries.values()]
+    this.state.clearPending()
+    const snapshot = [...this.state.entries.values()]
     if (snapshot.length === 0) {
-      this.entries.clear()
+      this.state.entries.clear()
       return
     }
     this.deps.log(`Disposing ${snapshot.length} terminal(s)`)
@@ -311,8 +267,8 @@ export class TerminalManager {
       this.deps.log(`Terminal dispose: ${failed}/${snapshot.length} PTYs may linger until kilo serve exits`)
     }
     for (const result of results) {
-      if (result.ok && this.entries.get(result.entry.terminalId) === result.entry) {
-        this.entries.delete(result.entry.terminalId)
+      if (result.ok && this.state.entries.get(result.entry.terminalId) === result.entry) {
+        this.state.entries.delete(result.entry.terminalId)
       }
     }
   }

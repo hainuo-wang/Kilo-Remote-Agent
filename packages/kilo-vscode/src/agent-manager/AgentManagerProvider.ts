@@ -159,6 +159,7 @@ export class AgentManagerProvider implements Disposable {
       log: (...args) => this.log("[XTerm]", ...args),
       post: (msg) => this.postToWebview(msg),
       getTerminalFont: () => readTerminalFont(),
+      getRemotePty: () => this.connectionService.getRemotePty(),
     })
     this.scripts = createScriptTerminalRuntime({
       connection: this.connectionService,

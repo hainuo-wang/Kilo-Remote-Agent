@@ -7,6 +7,11 @@ import type {
   ControllerHttpEvent,
   ControllerHttpRequest,
   ControllerHttpResponse,
+  ControllerPtyCloseRequest,
+  ControllerPtyCreateRequest,
+  ControllerPtyCreateResponse,
+  ControllerPtyResizeRequest,
+  PtyAccepted,
   RpcEvent,
   RpcError,
   RpcRequest,
@@ -39,6 +44,21 @@ export const HTTP_CANCEL_COMMAND = REMOTE_COMMANDS.controllerHttpCancel
 const WORKER_HEARTBEAT_TIMEOUT_MS = 20_000
 const WORKER_HEARTBEAT_CHECK_INTERVAL_MS = 5_000
 const WORKER_COMMAND_HANDSHAKE_TIMEOUT_MS = 30_000
+const PTY_BUFFER_LIMIT = 4 * 1024 * 1024
+const PTY_STATE_TTL_MS = 5 * 60_000
+
+type PtyState = {
+  requestId: string
+  streamId: string
+  socket?: WebSocket
+  queue: Buffer[]
+  queuedBytes: number
+  draining: boolean
+  finished: boolean
+  closeWhenDrained: boolean
+  inputQueue: Promise<void>
+  cleanupTimer?: ReturnType<typeof setTimeout>
+}
 
 export class ControllerBridge implements vscode.Disposable {
   private readonly token = randomBytes(32).toString("hex")
@@ -53,6 +73,7 @@ export class ControllerBridge implements vscode.Disposable {
   private readonly workerHeartbeatTimer: ReturnType<typeof setInterval>
   private readonly context: vscode.ExtensionContext
   private readonly sensitiveValues = new Set<string>()
+  private readonly ptys = new Map<string, PtyState>()
   private lastWorkerHeartbeat = Date.now()
   private workerUnavailable = false
 
@@ -92,6 +113,10 @@ export class ControllerBridge implements vscode.Disposable {
       const url = new URL(request.url ?? "/", "ws://127.0.0.1")
       if (url.searchParams.get("token") !== this.token) {
         socket.close(1008, "Unauthorized")
+        return
+      }
+      if (url.pathname === "/pty") {
+        this.acceptPtySocket(socket, url)
         return
       }
       this.clients.add(socket)
@@ -216,6 +241,80 @@ export class ControllerBridge implements vscode.Disposable {
     }
   }
 
+  async ptyCreate(request: ControllerPtyCreateRequest): Promise<ControllerPtyCreateResponse> {
+    if (!request || typeof request.cwd !== "string" || request.cwd.length === 0) {
+      throw new Error("Remote PTY cwd is required")
+    }
+    const requestId = crypto.randomUUID()
+    const streamId = `${requestId}:pty`
+    const state: PtyState = {
+      requestId,
+      streamId,
+      queue: [],
+      queuedBytes: 0,
+      draining: false,
+      finished: false,
+      closeWhenDrained: false,
+      inputQueue: Promise.resolve(),
+    }
+    this.ptys.set(streamId, state)
+    try {
+      const response = await this.request({
+        type: "request",
+        version: RPC_VERSION,
+        requestId,
+        method: "pty.start",
+        params: {
+          rootId: "workspace",
+          cwd: request.cwd,
+          ...(request.cols === undefined ? {} : { cols: request.cols }),
+          ...(request.rows === undefined ? {} : { rows: request.rows }),
+          ...(request.shell === undefined ? {} : { shell: request.shell }),
+        },
+      })
+      if (response.error) throw new Error(`${response.error.code}: ${response.error.message}`)
+      const accepted = response.result as PtyAccepted
+      if (!accepted || accepted.streamId !== streamId) throw new Error("Remote worker returned an invalid PTY")
+      const port = await this.ready
+      return {
+        streamId,
+        wsUrl: `ws://127.0.0.1:${port}/pty?token=${this.token}&streamId=${encodeURIComponent(streamId)}`,
+        pid: accepted.pid,
+        cwd: accepted.cwd,
+      }
+    } catch (error) {
+      this.disposePty(streamId)
+      throw error
+    }
+  }
+
+  async ptyResize(request: ControllerPtyResizeRequest): Promise<void> {
+    const state = this.requirePty(request.streamId)
+    const response = await this.request({
+      type: "request",
+      version: RPC_VERSION,
+      requestId: crypto.randomUUID(),
+      method: "pty.resize",
+      params: { streamId: state.streamId, cols: request.cols, rows: request.rows },
+    })
+    if (response.error) throw new Error(`${response.error.code}: ${response.error.message}`)
+  }
+
+  async ptyClose(request: ControllerPtyCloseRequest): Promise<void> {
+    const state = this.requirePty(request.streamId)
+    const response = await this.request({
+      type: "request",
+      version: RPC_VERSION,
+      requestId: crypto.randomUUID(),
+      method: "pty.close",
+      params: { streamId: state.streamId },
+    })
+    if (response.error && response.error.code !== "PTY_NOT_FOUND") {
+      throw new Error(`${response.error.code}: ${response.error.message}`)
+    }
+    this.finishPty(state)
+  }
+
   cancelHttp(requestId: string): void {
     this.httpRequests.get(requestId)?.abort()
   }
@@ -227,11 +326,24 @@ export class ControllerBridge implements vscode.Disposable {
     }
     if (event.streamId === "worker" && event.event === "closed") {
       for (const streams of this.clientStreams.values()) streams.clear()
+      for (const pty of this.ptys.values()) this.finishPty(pty)
     } else if (event.event === "exit" || event.event === "error" || event.event === "closed") {
       for (const streams of this.clientStreams.values()) streams.delete(event.streamId)
     }
     const data = JSON.stringify(event)
     await Promise.all([...this.clients].map((client) => this.write(client, data)))
+    const pty = this.ptys.get(event.streamId)
+    if (!pty) return
+    if (event.event === "stdout") {
+      const output = event.data as { encoding?: string; chunk?: string }
+      if (output.encoding === "base64" && typeof output.chunk === "string") {
+        this.enqueuePtyOutput(pty, Buffer.from(output.chunk, "base64"))
+      }
+      return
+    }
+    if (event.event === "exit" || event.event === "error" || event.event === "closed") {
+      this.finishPty(pty)
+    }
   }
 
   dispose(): void {
@@ -248,7 +360,122 @@ export class ControllerBridge implements vscode.Disposable {
     this.clientWrites.clear()
     this.clientRequests.clear()
     this.clientStreams.clear()
+    for (const streamId of this.ptys.keys()) this.disposePty(streamId)
+    this.ptys.clear()
     this.server.close()
+  }
+
+  private acceptPtySocket(socket: WebSocket, url: URL): void {
+    const streamId = url.searchParams.get("streamId")
+    if (!streamId) {
+      socket.close(1008, "Missing PTY stream")
+      return
+    }
+    const state = this.ptys.get(streamId)
+    if (!state) {
+      socket.close(1008, "Unknown PTY stream")
+      return
+    }
+    if (state.socket && state.socket.readyState === WebSocket.OPEN) {
+      state.socket.close(4009, "PTY already attached")
+    }
+    state.socket = socket
+    socket.on("message", (data) => this.enqueuePtyInput(state, data))
+    socket.once("close", () => {
+      if (state.socket === socket) state.socket = undefined
+    })
+    this.drainPty(state)
+  }
+
+  private enqueuePtyInput(state: PtyState, data: RawData): void {
+    if (state.finished) return
+    const bytes = Array.isArray(data) ? Buffer.concat(data) : Buffer.isBuffer(data) ? data : Buffer.from(data)
+    if (bytes.byteLength === 0) return
+    state.inputQueue = state.inputQueue
+      .catch(() => undefined)
+      .then(async () => {
+        const response = await this.request({
+          type: "request",
+          version: RPC_VERSION,
+          requestId: crypto.randomUUID(),
+          method: "pty.input",
+          params: {
+            streamId: state.streamId,
+            data: bytes.toString("base64"),
+          },
+        })
+        if (response.error) throw new Error(`${response.error.code}: ${response.error.message}`)
+      })
+      .catch((error) => {
+        this.finishPty(state)
+        if (state.socket?.readyState === WebSocket.OPEN) state.socket.close(1011, errorMessage(error))
+      })
+  }
+
+  private requirePty(streamId: string): PtyState {
+    const state = this.ptys.get(streamId)
+    if (!state) throw new Error(`Remote PTY stream not found: ${streamId}`)
+    return state
+  }
+
+  private enqueuePtyOutput(state: PtyState, data: Buffer): void {
+    if (data.byteLength > 0) {
+      state.queue.push(data)
+      state.queuedBytes += data.byteLength
+      while (state.queuedBytes > PTY_BUFFER_LIMIT && state.queue.length > 1) {
+        const removed = state.queue.shift()!
+        state.queuedBytes -= removed.byteLength
+      }
+    }
+    this.drainPty(state)
+  }
+
+  private drainPty(state: PtyState): void {
+    if (state.draining || !state.socket || state.socket.readyState !== WebSocket.OPEN) return
+    state.draining = true
+    void (async () => {
+      try {
+        while (state.socket && state.socket.readyState === WebSocket.OPEN && state.queue.length > 0) {
+          const frame = state.queue.shift()!
+          state.queuedBytes -= frame.byteLength
+          await this.writeBinary(state.socket, frame)
+        }
+        if (state.closeWhenDrained && state.queue.length === 0 && state.socket?.readyState === WebSocket.OPEN) {
+          state.socket.close(1000, "PTY exited")
+        }
+      } finally {
+        state.draining = false
+        if (state.socket && state.queue.length > 0) this.drainPty(state)
+      }
+    })().catch(() => undefined)
+  }
+
+  private writeBinary(socket: WebSocket, data: Buffer): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (socket.readyState !== WebSocket.OPEN) {
+        resolve()
+        return
+      }
+      socket.send(data, (error) => (error ? reject(error) : resolve()))
+    })
+  }
+
+  private finishPty(state: PtyState): void {
+    if (state.finished) return
+    state.finished = true
+    state.closeWhenDrained = true
+    this.drainPty(state)
+    state.cleanupTimer = setTimeout(() => this.disposePty(state.streamId), PTY_STATE_TTL_MS)
+    state.cleanupTimer.unref()
+  }
+
+  private disposePty(streamId: string): void {
+    const state = this.ptys.get(streamId)
+    if (!state) return
+    if (state.cleanupTimer) clearTimeout(state.cleanupTimer)
+    if (!state.finished) void this.cancelRemoteRequest(state.requestId, state.streamId)
+    state.socket?.close(1000, "PTY disposed")
+    this.ptys.delete(streamId)
   }
 
   private write(client: WebSocket, data: string): Promise<void> {
@@ -416,8 +643,7 @@ export class ControllerBridge implements vscode.Disposable {
           )
         : undefined
     const jsonChunks: Buffer[] | undefined =
-      contentType !== "text/event-stream" &&
-      (directoryMapping || (pathname && isCredentialResponsePath(pathname)))
+      contentType !== "text/event-stream" && (directoryMapping || (pathname && isCredentialResponsePath(pathname)))
         ? []
         : undefined
     let sequence = 0
@@ -545,4 +771,8 @@ function isCommandUnavailable(error: unknown): boolean {
 
 async function delay(timeoutMs: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, timeoutMs))
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
 }

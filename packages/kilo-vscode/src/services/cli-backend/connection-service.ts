@@ -6,7 +6,12 @@ import type { ServerConfig } from "./types"
 import { createDuplicateEventFilter, resolveEventSessionId as resolveEventSessionIdPure } from "./connection-utils"
 import { SandboxPreference } from "../sandbox-preference"
 import { ExplicitAbortState } from "./explicit-abort"
-import { createCursorRemoteFetch, type CursorRemoteFetch } from "../../experimental/cursor-remote/controller-client"
+import {
+  createCursorRemoteFetch,
+  createCursorRemotePty,
+  type CursorRemoteFetch,
+  type CursorRemotePty,
+} from "../../experimental/cursor-remote/controller-client"
 
 export type ConnectionState = "connecting" | "connected" | "disconnected" | "error"
 type SSEEventListener = (event: SSEPayload, directory?: string) => void
@@ -133,6 +138,7 @@ export class KiloConnectionService {
   private viewedDirty = false
   private unsubRemote: (() => void) | null = null
   private readonly remoteController: CursorRemoteFetch | undefined
+  private readonly remotePty: CursorRemotePty | undefined
 
   constructor(context: vscode.ExtensionContext, env?: () => Promise<Record<string, string>>) {
     const state =
@@ -145,6 +151,7 @@ export class KiloConnectionService {
     this.serverManager = new ServerManager(context, (code, signal) => this.handleServerExit(code, signal), env)
     this.remoteController = createCursorRemoteFetch(context)
     if (this.remoteController) context.subscriptions.push(this.remoteController.dispose)
+    this.remotePty = createCursorRemotePty()
     this.active = vscode.window.state.focused
     this.windowStateDisposable = vscode.window.onDidChangeWindowState((ws) => {
       this.active = ws.focused
@@ -239,6 +246,10 @@ export class KiloConnectionService {
 
   isCursorLikeRemote(): boolean {
     return this.remoteController !== undefined
+  }
+
+  getRemotePty(): CursorRemotePty | undefined {
+    return this.remotePty
   }
 
   /**

@@ -19,9 +19,7 @@ const streams = new Map<string, PendingStream>()
 let bridge: ControllerBridge | undefined
 
 export function activate(context: vscode.ExtensionContext) {
-  console.log(
-    `[Kilo Remote Controller] activated host=${process.platform} remote=${vscode.env.remoteName ?? "local"}`,
-  )
+  console.log(`[Kilo Remote Controller] activated host=${process.platform} remote=${vscode.env.remoteName ?? "local"}`)
   context.subscriptions.push(
     vscode.commands.registerCommand("kilo-code.new.remote.configureMioffice", () => configureMioffice(context)),
   )
@@ -55,6 +53,9 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand(HTTP_CANCEL_COMMAND, (request: { requestId: string }) =>
       bridge?.cancelHttp(request.requestId),
     ),
+    vscode.commands.registerCommand(REMOTE_COMMANDS.controllerPtyCreate, (request) => bridge?.ptyCreate(request)),
+    vscode.commands.registerCommand(REMOTE_COMMANDS.controllerPtyResize, (request) => bridge?.ptyResize(request)),
+    vscode.commands.registerCommand(REMOTE_COMMANDS.controllerPtyClose, (request) => bridge?.ptyClose(request)),
   )
   context.subscriptions.push(vscode.commands.registerCommand(SMOKE_COMMAND, runSmoke))
 }

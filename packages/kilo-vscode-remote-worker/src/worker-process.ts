@@ -1,8 +1,8 @@
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process"
 import { createInterface } from "node:readline"
 import * as vscode from "vscode"
 import type { RpcCancel, RpcEvent, RpcMessage, RpcRequest, RpcResponse } from "@kilocode/kilo-remote-protocol"
 import { isControllerCredentialEnvironmentKey, isRpcMessage, RPC_VERSION } from "@kilocode/kilo-remote-protocol"
+import { spawn, type ChildProcessWithoutNullStreams } from "./process"
 
 type WorkerMessageHandler = (message: RpcEvent) => Promise<void>
 

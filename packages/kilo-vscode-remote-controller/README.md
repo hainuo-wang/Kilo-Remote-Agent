@@ -40,9 +40,10 @@ against the byte counts reported by the remote worker. It does not use
 The prototype deliberately keeps Kilo's existing HTTP/SSE backend and SDK
 unchanged. The remote main extension proxies those HTTP/SSE requests through
 VS Code commands to the local controller; the local backend then talks to the
-remote worker through the same controller's localhost bridge. The Agent
-Manager terminal-tab UI is still outside the PoC path; its migration to the
-worker PTY stream requires a separate webview transport change.
+remote worker through the same controller's localhost bridge. Agent Manager
+embedded terminal tabs use a separate local WebSocket endpoint backed by the
+same Remote Worker PTY stream, so terminal output does not depend on
+`vscode.window.createTerminal()` capture.
 
 To create a local Windows companion VSIX, build the
 `@kilocode/cli-windows-x64` opencode artifact and run:

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test"
 import type { KiloClient } from "@kilocode/sdk/v2/client"
+import { RemoteTerminalManager } from "../../src/agent-manager/remote-terminal-manager"
 import { TerminalRouter } from "../../src/agent-manager/terminal-routing"
 import type { AgentManagerOutMessage } from "../../src/agent-manager/types"
 
@@ -10,6 +11,137 @@ function wait() {
 }
 
 describe("Agent Manager terminal routing", () => {
+  it("uses the Remote Worker PTY adapter when the experimental remote host is available", async () => {
+    const messages: AgentManagerOutMessage[] = []
+    const calls: string[] = []
+    const remotePty = {
+      create: async (input: { cwd: string; cols?: number; rows?: number }) => {
+        calls.push(`create:${input.cwd}:${input.cols ?? 0}:${input.rows ?? 0}`)
+        return { streamId: "remote-pty-1", wsUrl: "ws://127.0.0.1:1/pty", pid: 42, cwd: "." }
+      },
+      resize: async (input: { streamId: string; cols: number; rows: number }) => {
+        calls.push(`resize:${input.streamId}:${input.cols}:${input.rows}`)
+      },
+      close: async (input: { streamId: string }) => {
+        calls.push(`close:${input.streamId}`)
+      },
+    }
+    const router = new TerminalRouter({
+      getClient: () => {
+        throw new Error("local backend must not be used")
+      },
+      getClientAsync: async () => {
+        throw new Error("local backend must not be used")
+      },
+      getServerConfig: () => undefined,
+      getRoot: () => "/remote/workspace",
+      getWorktreePath: () => undefined,
+      getProjectId: () => undefined,
+      log: () => undefined,
+      post: (message) => messages.push(message),
+      getTerminalFont: () => font,
+      getRemotePty: () => remotePty,
+    })
+
+    router.handle({
+      type: "agentManager.terminal.create",
+      createId: "remote-1",
+      placement: "tab",
+      worktreeId: null,
+      cols: 120,
+      rows: 40,
+    })
+    await wait()
+
+    expect(calls).toEqual(["create:/remote/workspace:120:40"])
+    expect(messages[0]).toMatchObject({
+      type: "agentManager.terminal.created",
+      createId: "remote-1",
+      wsUrl: "ws://127.0.0.1:1/pty",
+    })
+
+    router.handle({ type: "agentManager.terminal.resize", terminalId: "remote-1", cols: 100, rows: 30 })
+    await wait()
+    expect(calls).toContain("resize:remote-pty-1:100:30")
+
+    router.handle({ type: "agentManager.terminal.close", terminalId: "remote-1" })
+    await wait()
+    expect(calls).toContain("close:remote-pty-1")
+    await router.dispose()
+  })
+
+  it("keeps the current remote PTY when a restart create fails", async () => {
+    const calls: string[] = []
+    const remotePty = {
+      create: async () => {
+        calls.push("create")
+        if (calls.filter((call) => call === "create").length === 2) throw new Error("worker unavailable")
+        return { streamId: "remote-pty-1", wsUrl: "ws://127.0.0.1:1/pty/one", pid: 42, cwd: "/remote/workspace" }
+      },
+      resize: async (input: { streamId: string; cols: number; rows: number }) => {
+        calls.push(`resize:${input.streamId}:${input.cols}:${input.rows}`)
+      },
+      close: async (input: { streamId: string }) => {
+        calls.push(`close:${input.streamId}`)
+      },
+    }
+    const manager = new RemoteTerminalManager(remotePty, () => undefined)
+    await manager.create({
+      terminalId: "remote-1",
+      worktreeId: null,
+      cwd: "/remote/workspace",
+      title: "Terminal 1",
+    })
+
+    await expect(manager.restart("remote-1")).rejects.toThrow("worker unavailable")
+    await manager.resize("remote-1", 100, 30)
+
+    expect(calls).toEqual(["create", "create", "resize:remote-pty-1:100:30"])
+    await manager.dispose()
+  })
+
+  it("serializes concurrent remote restarts and returns the same replacement", async () => {
+    const calls: string[] = []
+    let releaseCreate: (() => void) | undefined
+    let createCount = 0
+    const remotePty = {
+      create: async () => {
+        createCount++
+        calls.push(`create:${createCount}`)
+        if (createCount === 2) await new Promise<void>((resolve) => (releaseCreate = resolve))
+        return {
+          streamId: `remote-pty-${createCount - 1}`,
+          wsUrl: `ws://127.0.0.1:1/pty/${createCount - 1}`,
+          pid: 42,
+          cwd: "/remote/workspace",
+        }
+      },
+      resize: async () => undefined,
+      close: async (input: { streamId: string }) => {
+        calls.push(`close:${input.streamId}`)
+      },
+    }
+    const manager = new RemoteTerminalManager(remotePty, () => undefined)
+    await manager.create({
+      terminalId: "remote-1",
+      worktreeId: null,
+      cwd: "/remote/workspace",
+      title: "Terminal 1",
+    })
+
+    const first = manager.restart("remote-1")
+    await wait()
+    const second = manager.restart("remote-1")
+    await wait()
+    expect(calls).toEqual(["create:1", "create:2"])
+
+    releaseCreate?.()
+    await expect(first).resolves.toBe("ws://127.0.0.1:1/pty/1")
+    await expect(second).resolves.toBe("ws://127.0.0.1:1/pty/1")
+    expect(calls).toEqual(["create:1", "create:2", "close:remote-pty-0"])
+    await manager.dispose()
+  })
+
   it("round-trips side placement and rejects missing worktrees", async () => {
     const messages: AgentManagerOutMessage[] = []
     const envs: Array<Record<string, string> | undefined> = []

@@ -1,8 +1,8 @@
 import { randomBytes } from "node:crypto"
-import { type ChildProcess, spawn } from "node:child_process"
 import { existsSync, mkdirSync, statSync } from "node:fs"
 import path from "node:path"
 import * as vscode from "vscode"
+import { spawn, type ChildProcess } from "./process"
 
 export type LocalServerInstance = {
   port: number
