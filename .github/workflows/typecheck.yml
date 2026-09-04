@@ -65,7 +65,12 @@ jobs:
   typecheck-jetbrains:
     name: typecheck-jetbrains
     needs: changes
-    if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.jetbrains == 'true'
+    if: >-
+      github.repository == 'Kilo-Org/kilocode' &&
+      (
+        github.event_name == 'workflow_dispatch' ||
+        needs.changes.outputs.jetbrains == 'true'
+      )
     runs-on: ${{ github.repository == 'Kilo-Org/kilocode' && 'blacksmith-4vcpu-ubuntu-2404' || 'ubuntu-latest' }} # kilocode_change
     steps:
       - name: Checkout repository
