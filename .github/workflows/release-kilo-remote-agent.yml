@@ -107,7 +107,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ! git grep -n -I -E 'DUCKCODING_API_KEY=sk-|Authorization: Bearer sk-|mioffice\\.apiKey.{0,80}sk-' -- ':!*.lock'
+          ! git grep -n -I -E 'DUCKCODING_API_KEY=sk-|Authorization: Bearer sk-|mioffice\\.apiKey.{0,80}sk-' -- \
+            ':!*.lock' \
+            ':!.github/workflows/release-kilo-remote-agent.yml'
           for package in \
             packages/kilo-vscode/out/kilo-remote-agent-linux-x64.vsix \
             packages/kilo-vscode-remote-controller/out/kilo-remote-agent-controller-win32-x64.vsix \
@@ -120,8 +122,15 @@ jobs:
             unzip -p "$package" extension/package.json \
               | grep -E '"(name|publisher)": "(kilo-remote-agent|hainuo-wang)' >/dev/null
           done
-          unzip -l "packages/kilo-vscode-remote-installer/out/kilo-remote-agent-installer-${{ steps.version.outputs.value }}.vsix" \
-            | grep -E 'payload/kilo-remote-agent-(controller-win32-x64|controller-linux-x64|linux-x64|worker-linux-x64)\\.vsix'
+          installer="packages/kilo-vscode-remote-installer/out/kilo-remote-agent-installer-${{ steps.version.outputs.value }}.vsix"
+          for payload in \
+            kilo-remote-agent-controller-win32-x64.vsix \
+            kilo-remote-agent-controller-linux-x64.vsix \
+            kilo-remote-agent-linux-x64.vsix \
+            kilo-remote-agent-worker-linux-x64.vsix
+          do
+            unzip -l "$installer" | grep -F "extension/payload/$payload" >/dev/null
+          done
           unzip -p "packages/kilo-vscode-remote-pack/out/kilo-remote-agent-pack-${{ steps.version.outputs.value }}.vsix" \
             extension/package.json | grep -E '"extensionPack":'
 
