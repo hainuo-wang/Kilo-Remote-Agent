@@ -93,21 +93,20 @@ jobs:
         run: |
           set -euo pipefail
           dir="$RUNNER_TEMP/kilo-remote-agent-marketplace"
-          for package in \
-            "$dir/kilo-remote-agent-linux-x64.vsix" \
-            "$dir/kilo-remote-agent-controller-win32-x64.vsix" \
-            "$dir/kilo-remote-agent-controller-linux-x64.vsix" \
-            "$dir/kilo-remote-agent-worker-linux-x64.vsix"
-          do
-            test -f "$package"
-            bun packages/kilo-vscode-remote-pack/node_modules/.bin/vsce publish \
-              --skip-duplicate \
-              --packagePath "$package"
-          done
           version="${{ inputs.tag }}"
           version="${version#v}"
           pack="$dir/kilo-remote-agent-pack-${version}.vsix"
-          test -f "$pack"
-          bun packages/kilo-vscode-remote-pack/node_modules/.bin/vsce publish \
-            --skip-duplicate \
-            --packagePath "$pack"
+          main="$dir/kilo-remote-agent-linux-x64.vsix"
+          controller_windows="$dir/kilo-remote-agent-controller-win32-x64.vsix"
+          controller_linux="$dir/kilo-remote-agent-controller-linux-x64.vsix"
+          worker="$dir/kilo-remote-agent-worker-linux-x64.vsix"
+
+          for package in "$main" "$controller_windows" "$controller_linux" "$worker" "$pack"; do
+            test -f "$package"
+          done
+
+          vsce="packages/kilo-vscode-remote-pack/node_modules/.bin/vsce"
+          bun "$vsce" publish --skip-duplicate --packagePath "$main"
+          bun "$vsce" publish --skip-duplicate --packagePath "$controller_windows" "$controller_linux"
+          bun "$vsce" publish --skip-duplicate --packagePath "$worker"
+          bun "$vsce" publish --skip-duplicate --packagePath "$pack"
