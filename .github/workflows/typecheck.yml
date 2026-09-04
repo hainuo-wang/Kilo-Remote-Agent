@@ -14,7 +14,10 @@ jobs:
     runs-on: ${{ github.repository == 'Kilo-Org/kilocode' && 'blacksmith-4vcpu-ubuntu-2404' || 'ubuntu-latest' }} # kilocode_change
     outputs:
       javascript: ${{ github.event_name == 'workflow_dispatch' && 'true' || steps.filter.outputs.javascript }}
-      jetbrains: ${{ github.event_name == 'workflow_dispatch' && 'true' || steps.filter.outputs.jetbrains }}
+      jetbrains: >-
+        ${{ github.repository == 'Kilo-Org/kilocode' &&
+        (github.event_name == 'workflow_dispatch' && 'true' || steps.filter.outputs.jetbrains) ||
+        'false' }}
     steps:
       - name: Checkout repository
         if: github.event_name != 'workflow_dispatch'
