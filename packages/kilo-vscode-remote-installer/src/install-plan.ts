@@ -8,6 +8,8 @@ export type InstallerPlatform = {
 export type InstallerPayload =
   | "kilo-remote-agent-controller-win32-x64.vsix"
   | "kilo-remote-agent-controller-linux-x64.vsix"
+  | "kilo-remote-agent-controller-darwin-x64.vsix"
+  | "kilo-remote-agent-controller-darwin-arm64.vsix"
   | "kilo-remote-agent-linux-x64.vsix"
   | "kilo-remote-agent-worker-linux-x64.vsix"
 
@@ -29,6 +31,12 @@ export function resolvePayloads(side: InstallerSide, platform: InstallerPlatform
     }
     if (platform.platform === "linux" && platform.arch === "x64") {
       return ["kilo-remote-agent-controller-linux-x64.vsix"]
+    }
+    if (platform.platform === "darwin" && platform.arch === "x64") {
+      return ["kilo-remote-agent-controller-darwin-x64.vsix"]
+    }
+    if (platform.platform === "darwin" && platform.arch === "arm64") {
+      return ["kilo-remote-agent-controller-darwin-arm64.vsix"]
     }
     return []
   }

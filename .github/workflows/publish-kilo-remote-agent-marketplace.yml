@@ -44,6 +44,8 @@ jobs:
             --pattern 'kilo-remote-agent-linux-x64.vsix' \
             --pattern 'kilo-remote-agent-controller-win32-x64.vsix' \
             --pattern 'kilo-remote-agent-controller-linux-x64.vsix' \
+            --pattern 'kilo-remote-agent-controller-darwin-x64.vsix' \
+            --pattern 'kilo-remote-agent-controller-darwin-arm64.vsix' \
             --pattern 'kilo-remote-agent-worker-linux-x64.vsix' \
             --pattern "kilo-remote-agent-pack-${version}.vsix"
 
@@ -65,6 +67,8 @@ jobs:
             ["kilo-remote-agent-linux-x64.vsix", "hainuo-wang.kilo-remote-agent"],
             ["kilo-remote-agent-controller-win32-x64.vsix", "hainuo-wang.kilo-remote-agent-controller"],
             ["kilo-remote-agent-controller-linux-x64.vsix", "hainuo-wang.kilo-remote-agent-controller"],
+            ["kilo-remote-agent-controller-darwin-x64.vsix", "hainuo-wang.kilo-remote-agent-controller"],
+            ["kilo-remote-agent-controller-darwin-arm64.vsix", "hainuo-wang.kilo-remote-agent-controller"],
             ["kilo-remote-agent-worker-linux-x64.vsix", "hainuo-wang.kilo-remote-agent-worker"],
             [`kilo-remote-agent-pack-${version}.vsix`, "hainuo-wang.kilo-remote-agent-pack"],
           ])
@@ -99,14 +103,16 @@ jobs:
           main="$dir/kilo-remote-agent-linux-x64.vsix"
           controller_windows="$dir/kilo-remote-agent-controller-win32-x64.vsix"
           controller_linux="$dir/kilo-remote-agent-controller-linux-x64.vsix"
+          controller_macos_intel="$dir/kilo-remote-agent-controller-darwin-x64.vsix"
+          controller_macos_arm="$dir/kilo-remote-agent-controller-darwin-arm64.vsix"
           worker="$dir/kilo-remote-agent-worker-linux-x64.vsix"
 
-          for package in "$main" "$controller_windows" "$controller_linux" "$worker" "$pack"; do
+          for package in "$main" "$controller_windows" "$controller_linux" "$controller_macos_intel" "$controller_macos_arm" "$worker" "$pack"; do
             test -f "$package"
           done
 
           vsce="packages/kilo-vscode-remote-pack/node_modules/.bin/vsce"
           bun "$vsce" publish --skip-duplicate --packagePath "$main"
-          bun "$vsce" publish --skip-duplicate --packagePath "$controller_windows" "$controller_linux"
+          bun "$vsce" publish --skip-duplicate --packagePath "$controller_windows" "$controller_linux" "$controller_macos_intel" "$controller_macos_arm"
           bun "$vsce" publish --skip-duplicate --packagePath "$worker"
           bun "$vsce" publish --skip-duplicate --packagePath "$pack"

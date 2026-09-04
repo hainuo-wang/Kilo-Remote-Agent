@@ -27,6 +27,20 @@ const payloads = [
     destination: "kilo-remote-agent-controller-linux-x64.vsix",
   },
   {
+    source: path.join(
+      repositoryDirectory,
+      "packages/kilo-vscode-remote-controller/out/kilo-remote-agent-controller-darwin-x64.vsix",
+    ),
+    destination: "kilo-remote-agent-controller-darwin-x64.vsix",
+  },
+  {
+    source: path.join(
+      repositoryDirectory,
+      "packages/kilo-vscode-remote-controller/out/kilo-remote-agent-controller-darwin-arm64.vsix",
+    ),
+    destination: "kilo-remote-agent-controller-darwin-arm64.vsix",
+  },
+  {
     source: path.join(repositoryDirectory, "packages/kilo-vscode/out/kilo-remote-agent-linux-x64.vsix"),
     destination: "kilo-remote-agent-linux-x64.vsix",
   },

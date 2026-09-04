@@ -22,6 +22,18 @@ describe("offline installer plan", () => {
     ])
   })
 
+  it("installs the Intel Mac Controller in a local macOS window", () => {
+    expect(resolvePayloads("local", { platform: "darwin", arch: "x64" })).toEqual([
+      "kilo-remote-agent-controller-darwin-x64.vsix",
+    ])
+  })
+
+  it("installs the Apple Silicon Controller in a local macOS window", () => {
+    expect(resolvePayloads("local", { platform: "darwin", arch: "arm64" })).toEqual([
+      "kilo-remote-agent-controller-darwin-arm64.vsix",
+    ])
+  })
+
   it("installs Main and Worker in a Linux Remote SSH window", () => {
     expect(resolveInstallerSide({ kind: "workspace", remoteName: "ssh-remote+gpu" })).toBe("remote-ssh")
     expect(resolvePayloads("remote-ssh", { platform: "linux", arch: "x64" })).toEqual([
@@ -36,7 +48,7 @@ describe("offline installer plan", () => {
   })
 
   it("rejects unsupported platforms", () => {
-    expect(resolvePayloads("local", { platform: "darwin", arch: "arm64" })).toEqual([])
+    expect(resolvePayloads("local", { platform: "freebsd", arch: "x64" })).toEqual([])
     expect(resolvePayloads("remote-ssh", { platform: "linux", arch: "arm64" })).toEqual([])
   })
 })

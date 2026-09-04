@@ -101,16 +101,20 @@ API Key，也不创建额外 SSH 连接。
 
 #### 手动安装运行时组件
 
-Windows 本机 + Linux 远程服务器需要：
+Windows 或 macOS 本机 + Linux 远程服务器需要：
 
 ```text
 kilo-remote-agent-controller-win32-x64.vsix
+kilo-remote-agent-controller-darwin-x64.vsix
+kilo-remote-agent-controller-darwin-arm64.vsix
 kilo-remote-agent-linux-x64.vsix
 kilo-remote-agent-worker-linux-x64.vsix
 ```
 
-Controller 安装在本机窗口；Main Agent 和 Worker 使用 Remote SSH 窗口的
-“Install in SSH”安装。官方 Kilo Code 扩展不是该独立构建的运行依赖。
+Windows 本机选择 `win32-x64`；Intel Mac 选择 `darwin-x64`；Apple Silicon
+Mac 选择 `darwin-arm64`。Controller 安装在本机窗口；Main Agent 和 Worker
+使用 Remote SSH 窗口的“Install in SSH”安装。官方 Kilo Code 扩展不是该
+独立构建的运行依赖。
 
 ### 测试与验收
 
@@ -244,10 +248,13 @@ Install the same file in the local window and in the Remote SSH window, then
 run `Kilo Remote Agent: Install Components` in each window. The local run
 installs the Controller; the Remote SSH run installs Main Agent and Worker.
 
-Manual Windows-local/Linux-remote installation uses:
+Manual Windows-local or macOS-local/Linux-remote installation uses the matching
+Controller package:
 
 ```text
 kilo-remote-agent-controller-win32-x64.vsix
+kilo-remote-agent-controller-darwin-x64.vsix
+kilo-remote-agent-controller-darwin-arm64.vsix
 kilo-remote-agent-linux-x64.vsix
 kilo-remote-agent-worker-linux-x64.vsix
 ```

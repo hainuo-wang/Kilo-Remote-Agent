@@ -82,6 +82,22 @@ jobs:
           KILO_REMOTE_CONTROLLER_TARGET: linux-x64
         run: bun run package
 
+      - name: Build local Intel Mac controller extension
+        working-directory: packages/kilo-vscode-remote-controller
+        env:
+          # kilocode_change
+          KILO_VERSION: ${{ steps.version.outputs.value }}
+          KILO_REMOTE_CONTROLLER_TARGET: darwin-x64
+        run: bun run package
+
+      - name: Build local Apple Silicon controller extension
+        working-directory: packages/kilo-vscode-remote-controller
+        env:
+          # kilocode_change
+          KILO_VERSION: ${{ steps.version.outputs.value }}
+          KILO_REMOTE_CONTROLLER_TARGET: darwin-arm64
+        run: bun run package
+
       - name: Build remote Linux worker extension
         working-directory: packages/kilo-vscode-remote-worker
         env:
@@ -114,6 +130,8 @@ jobs:
             packages/kilo-vscode/out/kilo-remote-agent-linux-x64.vsix \
             packages/kilo-vscode-remote-controller/out/kilo-remote-agent-controller-win32-x64.vsix \
             packages/kilo-vscode-remote-controller/out/kilo-remote-agent-controller-linux-x64.vsix \
+            packages/kilo-vscode-remote-controller/out/kilo-remote-agent-controller-darwin-x64.vsix \
+            packages/kilo-vscode-remote-controller/out/kilo-remote-agent-controller-darwin-arm64.vsix \
             packages/kilo-vscode-remote-worker/out/kilo-remote-agent-worker-linux-x64.vsix \
             packages/kilo-vscode-remote-installer/out/kilo-remote-agent-installer-${{ steps.version.outputs.value }}.vsix \
             packages/kilo-vscode-remote-pack/out/kilo-remote-agent-pack-${{ steps.version.outputs.value }}.vsix
@@ -126,6 +144,8 @@ jobs:
           for payload in \
             kilo-remote-agent-controller-win32-x64.vsix \
             kilo-remote-agent-controller-linux-x64.vsix \
+            kilo-remote-agent-controller-darwin-x64.vsix \
+            kilo-remote-agent-controller-darwin-arm64.vsix \
             kilo-remote-agent-linux-x64.vsix \
             kilo-remote-agent-worker-linux-x64.vsix
           do
@@ -144,6 +164,8 @@ jobs:
             packages/kilo-vscode/out/kilo-remote-agent-linux-x64.vsix \
             packages/kilo-vscode-remote-controller/out/kilo-remote-agent-controller-win32-x64.vsix \
             packages/kilo-vscode-remote-controller/out/kilo-remote-agent-controller-linux-x64.vsix \
+            packages/kilo-vscode-remote-controller/out/kilo-remote-agent-controller-darwin-x64.vsix \
+            packages/kilo-vscode-remote-controller/out/kilo-remote-agent-controller-darwin-arm64.vsix \
             packages/kilo-vscode-remote-worker/out/kilo-remote-agent-worker-linux-x64.vsix \
             packages/kilo-vscode-remote-installer/out/kilo-remote-agent-installer-${{ steps.version.outputs.value }}.vsix \
             packages/kilo-vscode-remote-pack/out/kilo-remote-agent-pack-${{ steps.version.outputs.value }}.vsix
