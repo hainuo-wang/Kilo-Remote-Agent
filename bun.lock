@@ -450,7 +450,7 @@
     },
     "packages/kilo-vscode": {
       "name": "kilo-remote-agent",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "dependencies": {
         "@anthropic-ai/sdk": "^0.39.0",
         "@kilocode/kilo-gateway": "workspace:*",
@@ -528,7 +528,7 @@
     },
     "packages/kilo-vscode-remote-controller": {
       "name": "kilo-remote-agent-controller",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "dependencies": {
         "@kilocode/kilo-remote-protocol": "workspace:*",
         "ws": "8.21.0",
@@ -544,9 +544,29 @@
         "typescript": "catalog:",
       },
     },
+    "packages/kilo-vscode-remote-installer": {
+      "name": "kilo-remote-agent-installer",
+      "version": "0.2.0",
+      "devDependencies": {
+        "@tsconfig/bun": "catalog:",
+        "@types/node": "catalog:",
+        "@types/vscode": "^1.105.1",
+        "@typescript/native-preview": "catalog:",
+        "@vscode/vsce": "^3.7.1",
+        "esbuild": "^0.27.2",
+        "typescript": "catalog:",
+      },
+    },
+    "packages/kilo-vscode-remote-pack": {
+      "name": "kilo-remote-agent-pack",
+      "version": "0.2.0",
+      "devDependencies": {
+        "@vscode/vsce": "^3.7.1",
+      },
+    },
     "packages/kilo-vscode-remote-worker": {
       "name": "kilo-remote-agent-worker",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "dependencies": {
         "@kilocode/kilo-remote-protocol": "workspace:*",
       },
@@ -3837,6 +3857,10 @@
     "kilo-remote-agent": ["kilo-remote-agent@workspace:packages/kilo-vscode"],
 
     "kilo-remote-agent-controller": ["kilo-remote-agent-controller@workspace:packages/kilo-vscode-remote-controller"],
+
+    "kilo-remote-agent-installer": ["kilo-remote-agent-installer@workspace:packages/kilo-vscode-remote-installer"],
+
+    "kilo-remote-agent-pack": ["kilo-remote-agent-pack@workspace:packages/kilo-vscode-remote-pack"],
 
     "kilo-remote-agent-worker": ["kilo-remote-agent-worker@workspace:packages/kilo-vscode-remote-worker"],
 

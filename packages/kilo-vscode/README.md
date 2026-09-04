@@ -1,152 +1,75 @@
-<p align="center">
-  <a href="https://marketplace.visualstudio.com/items?itemName=kilocode.Kilo-Code"><img src="https://raster.shields.io/badge/VS_Code_Marketplace-007ACC?style=flat&logo=visualstudiocode&logoColor=white" alt="VS Code Marketplace" height="20"></a>
-  <a href="https://x.com/kilocode"><img src="https://raster.shields.io/badge/kilocode-000000?style=flat&logo=x&logoColor=white" alt="X (Twitter)" height="20"></a>
-  <a href="https://blog.kilo.ai"><img src="https://raster.shields.io/badge/Blog-555?style=flat&logo=substack&logoColor=white" alt="Substack Blog" height="20"></a>
-  <a href="https://kilo.ai/discord"><img src="https://raster.shields.io/badge/Join%20Discord-5865F2?style=flat&logo=discord&logoColor=white" alt="Discord" height="20"></a>
-  <a href="https://www.reddit.com/r/kilocode/"><img src="https://raster.shields.io/badge/Join%20r%2Fkilocode-D84315?style=flat&logo=reddit&logoColor=white" alt="Reddit" height="20"></a>
-</p>
+# Kilo Remote Agent
 
-<p align="center">
-  <a href="https://kilo.ai"><img width="250" alt="kilo-code-logo" src="https://github.com/user-attachments/assets/bdb0c174-b9fd-40ad-a47b-f3aab9b54e8d" /></a>
-</p>
+Kilo Remote Agent is a Cursor-style AI coding agent for VS Code Remote SSH,
+network-restricted Linux servers, offline development environments, and
+remote workspaces without Internet access.
 
-<p align="center">
-  <strong>Kilo is the all-in-one agentic engineering platform.</strong><br>
-  Build, ship, and iterate faster with the most popular open source coding agent.
-</p>
+The local Controller keeps the agent loop, LLM provider, model requests,
+session state, and API credentials on the local workstation. This workspace
+extension runs on the Remote SSH host and routes workspace operations to the
+remote execution boundary.
 
-<p align="center">
-  <img width="100%" alt="Kilo Code running inside VS Code" src="https://kilo.ai/_next/image?url=%2Fscreenshots%2Fvs-code%2Fvs-code-home-page-screenshot.png&w=3840&q=75">
-</p>
+## Install
 
-<p align="center">
-  <a href="https://kilo.ai">Website</a> ·
-  <a href="https://kilo.ai/install">Install</a> ·
-  <a href="https://kilo.ai/landing/vs-code">IDE</a> ·
-  <a href="https://kilo.ai/cli">CLI</a> ·
-  <a href="https://kilo.ai/docs">Docs</a> ·
-  <a href="https://kilo.ai/leaderboard">Models</a> ·
-  <a href="https://kilo.ai/gateway">Gateway</a> ·
-  <a href="https://kilo.ai/pricing">Pricing</a> ·
-  <a href="https://kilo.ai/pricing/kilo-pass">Kilo Pass</a>
-</p>
+For normal online installation, install the **Kilo Remote Agent** Extension
+Pack from the VS Code Marketplace. It installs the three runtime components:
 
-<p align="center">
-  500+ models. One open source agent in <a href="https://kilo.ai/install">VS Code</a>, <a href="https://kilo.ai/features/jetbrains-native">JetBrains</a>, <a href="https://kilo.ai/cli">CLI</a>, <a href="https://kilo.ai/slack">Slack</a>, and <a href="https://kilo.ai/cloud">Cloud</a>.
-</p>
+- `hainuo-wang.kilo-remote-agent` — Remote SSH workspace integration;
+- `hainuo-wang.kilo-remote-agent-controller` — local model and credential controller;
+- `hainuo-wang.kilo-remote-agent-worker` — remote filesystem, processes, PTY, and command execution.
 
-> 🚀 **Coming from Roo Code?** Switch to Kilo and check out our [migration guide](https://kilo.ai/articles/roo-to-kilo-migration-guide)!
+For an offline or network-restricted environment, download the single-file
+Installer VSIX from the GitHub Release. Install the same Installer VSIX once
+in the local VS Code window and once in the Remote SSH window. It installs
+the Controller locally and the Main Agent plus Worker remotely.
 
-## Key Features
+## Architecture
 
-- **Code Generation:** Kilo can generate code using natural language.
-- **Inline Autocomplete:** Get intelligent code completions as you type, powered by AI.
-- **Task Automation:** Kilo can automate repetitive coding tasks to save time..
-- **Automated Refactoring:** Kilo can refactor and improve existing code efficiently.
-- **MCP Server Marketplace**: Kilo can easily find, and use MCP servers to extend the agent capabilities.
-- **Multi Mode**: Plan with Architect, Code with Coder, and Debug with Debugger, and make your own custom modes.
-
-## Get Started
-
-1. Install the Kilo Code extension from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=kilocode.Kilo-Code).
-2. Create your account to access 500+ cutting-edge AI models including GPT-5.5, Claude Opus 4.7, Claude Sonnet 4.6, and Gemini 3.1 Pro Preview, with transparent pricing that matches provider rates exactly.
-3. Start coding with AI that adapts to your workflow. Watch our quick-start guide to see Kilo in action:
-
-<a href="https://youtu.be/pqGfYXgrhig"><img src="https://img.youtube.com/vi/pqGfYXgrhig/maxresdefault.jpg" alt="Watch the video" width="640" height="360"></a>
-
-## Developer Setup
-
-If you want to contribute or modify the extension locally, see the [DEVELOPMENT.md](/DEVELOPMENT.md) file for build and setup instructions.
-
-### Snapshot Builds
-
-To build and share a development snapshot of the extension:
-
-```bash
-# Run from packages/kilo-vscode/
-
-# Build only (outputs VSIX to system temp dir)
-bun run snapshot:build
-
-# Build and install directly into VS Code
-bun run snapshot:install
+```text
+Local workstation
+  Agent loop · LLM provider · SecretStorage · local kilo serve
+                         │
+                         │ VS Code Remote SSH command transport
+                         ▼
+Remote Linux workspace
+  Filesystem · shell · PTY · processes · Python · pytest · Git · CUDA
 ```
 
-The snapshot version embeds the current commit SHA and your git username (from `git config user.name`), e.g. `7.0.47-snapshot+8ff7f2d02.kirillk`.
+The remote server does not receive the local API key and does not need
+Internet access to reach the model provider. The project does not create an
+additional SSH connection, use `ssh -R`, or bypass the authentication and
+MFA flow managed by VS Code Remote SSH.
 
-## Contributing
+## Configuration
 
-We welcome contributions from developers, writers, and enthusiasts!
-To get started, please read our [Contributing Guide](/CONTRIBUTING.md). It includes details on setting up your environment, coding standards, types of contribution and how to submit pull requests.
+Enable the experimental architecture in local User settings:
 
-## Code of Conduct
+```json
+{
+  "kilo-code.new.experimental.cursorLikeRemote": true,
+  "kilo-code.new.experimental.duckcoding.baseURL": "https://api.duckcoding.ai/v1",
+  "kilo-code.new.experimental.duckcoding.model": "gpt-5.6-sol",
+  "kilo-code.new.experimental.duckcoding.api": "responses"
+}
+```
 
-Our community is built on respect, inclusivity, and collaboration. Please review our [Code of Conduct](/CODE_OF_CONDUCT.md) to understand the expectations for all contributors and community members.
+Configure the key only from the local Command Palette:
+
+```text
+Kilo: Configure Local DuckCoding API Key
+```
+
+The key is stored in local VS Code `SecretStorage` under
+`duckcoding.apiKey`. Do not put it in the workspace, remote settings, remote
+environment, or shell commands.
+
+## Documentation
+
+See the repository [README](https://github.com/hainuo-wang/Kilo-Remote-Agent)
+for installation details, offline verification, Remote SSH disconnect
+handling, and the upstream synchronization strategy.
 
 ## License
 
-This project is licensed under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0).
-You’re free to use, modify, and distribute this code, including for commercial purposes as long as you include proper attribution and license notices. See [License](/LICENSE).
-
-## Contributing
-
-Contributions are welcome, and they are greatly appreciated! Get started by reading our [Contributing Guide](CONTRIBUTING.md). Or join our [Discord](https://kilo.ai/discord) to chat with the team and community.
-
-Thanks to all the contributors who help make Kilo better!
-
-<table>
-  <tr>
-    <td align="center">
-      <a href="https://github.com/mcowger">
-        <img src="https://avatars.githubusercontent.com/u/1929548?size=100" width="100" height="100" alt="mcowger" style="border-radius: 50%;" />
-      </a>
-    </td>
-    <td align="center">
-      <a href="https://github.com/bhaktatejas922">
-        <img src="https://avatars.githubusercontent.com/u/26863466?size=100" width="100" height="100" alt="bhaktatejas922" style="border-radius: 50%;" />
-      </a>
-    </td>
-    <td align="center">
-      <a href="https://github.com/NyxJae">
-        <img src="https://avatars.githubusercontent.com/u/52313587?size=100" width="100" height="100" alt="NyxJae" style="border-radius: 50%;" />
-      </a>
-    </td>
-    <td align="center">
-      <a href="https://github.com/Aikiboy123">
-        <img src="https://avatars.githubusercontent.com/u/161741275?size=100" width="100" height="100" alt="Aikiboy123" style="border-radius: 50%;" />
-      </a>
-    </td>
-    <td align="center">
-      <a href="https://github.com/cobra91">
-        <img src="https://avatars.githubusercontent.com/u/1060585?size=100" width="100" height="100" alt="cobra91" style="border-radius: 50%;" />
-      </a>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <a href="https://github.com/ivanarifin">
-        <img src="https://avatars.githubusercontent.com/u/111653938?size=100" width="100" height="100" alt="ivanarifin" style="border-radius: 50%;" />
-      </a>
-    </td>
-    <td align="center">
-      <a href="https://github.com/PeterDaveHello">
-        <img src="https://avatars.githubusercontent.com/u/3691490?size=100" width="100" height="100" alt="PeterDaveHello" style="border-radius: 50%;" />
-      </a>
-    </td>
-    <td align="center">
-      <a href="https://github.com/possible055">
-        <img src="https://avatars.githubusercontent.com/u/38576169?size=100" width="100" height="100" alt="possible055" style="border-radius: 50%;" />
-      </a>
-    </td>
-    <td align="center">
-      <a href="https://github.com/seuros">
-        <img src="https://avatars.githubusercontent.com/u/2394703?size=100" width="100" height="100" alt="seuros" style="border-radius: 50%;" />
-      </a>
-    </td>
-    <td align="center">
-      <a href="https://github.com/Kilo-Org/kilocode/graphs/contributors">
-        <b>more ...</b>
-      </a>
-    </td>
-  </tr>
-</table>
+MIT. This project is based on Kilo Code and OpenCode and retains their
+respective licenses and attribution.

@@ -1,14 +1,15 @@
 .vscode/**
 .vscode-test/**
+.gitignore
 node_modules/**
 .turbo/**
 src/**
-esbuild.js
 script/**
 test/**
 tsconfig.json
+esbuild.js
 **/*.map
 
 !dist/**
-!bin/**
+!payload/**
 !assets/**

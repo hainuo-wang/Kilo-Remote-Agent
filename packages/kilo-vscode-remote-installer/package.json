@@ -1,8 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "name": "kilo-remote-agent-worker",
-  "displayName": "Kilo Remote Agent Worker",
-  "description": "Remote filesystem, process, PTY, and Git execution worker for Kilo Remote Agent.",
+  "name": "kilo-remote-agent-installer",
+  "displayName": "Kilo Remote Agent Installer",
+  "description": "Offline installer for the local Controller and Remote SSH components of Kilo Remote Agent.",
   "version": "0.2.0",
   "publisher": "hainuo-wang",
   "icon": "assets/logo-outline-black.png",
@@ -12,48 +12,42 @@
   "keywords": [
     "remote ssh",
     "remote agent",
-    "remote worker",
+    "offline installer",
     "offline server",
-    "network restricted"
+    "network restricted",
+    "no internet"
   ],
   "repository": {
     "type": "git",
     "url": "https://github.com/hainuo-wang/Kilo-Remote-Agent.git",
-    "directory": "packages/kilo-vscode-remote-worker"
+    "directory": "packages/kilo-vscode-remote-installer"
   },
   "license": "MIT",
   "engines": {
     "vscode": "^1.105.1"
   },
-  "api": "none",
   "extensionKind": [
     "workspace"
   ],
   "activationEvents": [
-    "onStartupFinished"
+    "onCommand:kilo-remote-agent-installer.install"
   ],
   "main": "./dist/extension.js",
   "contributes": {
-    "configuration": {
-      "title": "Kilo Remote Agent Worker",
-      "properties": {
-        "kilo-code.remoteWorker.cliPath": {
-          "type": "string",
-          "description": "Optional path to the Kilo CLI used by the remote worker.",
-          "scope": "machine"
-        }
+    "commands": [
+      {
+        "command": "kilo-remote-agent-installer.install",
+        "title": "Kilo Remote Agent: Install Components"
       }
-    }
+    ]
   },
   "scripts": {
     "build": "node esbuild.js",
     "bundle": "node esbuild.js",
+    "package": "bun run build && bun script/package.ts",
+    "test": "bun test test",
     "check-types": "tsgo --noEmit",
-    "typecheck": "bun run check-types",
-    "package": "bun run build && bun script/package.ts --package"
-  },
-  "dependencies": {
-    "@kilocode/kilo-remote-protocol": "workspace:*"
+    "typecheck": "bun run check-types"
   },
   "devDependencies": {
     "@types/node": "catalog:",

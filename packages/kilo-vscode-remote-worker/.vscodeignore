@@ -11,3 +11,4 @@ tsconfig.json
 
 !dist/**
 !bin/**
+!assets/**

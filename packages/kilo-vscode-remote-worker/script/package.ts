@@ -18,9 +18,21 @@ if (!cliDirectory) {
 const packageDirectory = dirname(import.meta.dir)
 const source = join(packageDirectory, "..", "opencode", "dist", "@kilocode", cliDirectory, "bin", "kilo")
 const destination = join(packageDirectory, "bin", "kilo")
+const iconSource = join(packageDirectory, "..", "kilo-vscode", "assets", "icons", "logo-outline-black.png")
+const iconDestination = join(packageDirectory, "assets", "logo-outline-black.png")
+const packageJsonPath = join(packageDirectory, "package.json")
+const packageJson = await Bun.file(packageJsonPath).json()
+const version = process.env.KILO_VERSION ?? packageJson.version
+
+if (packageJson.version !== version) {
+  packageJson.version = version
+  await Bun.write(packageJsonPath, JSON.stringify(packageJson, null, 2) + "\n")
+}
 
 await rm(join(packageDirectory, "bin"), { recursive: true, force: true })
 await mkdir(dirname(destination), { recursive: true })
+await mkdir(dirname(iconDestination), { recursive: true })
+await cp(iconSource, iconDestination)
 
 try {
   await cp(source, destination)

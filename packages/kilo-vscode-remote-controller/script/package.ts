@@ -12,6 +12,15 @@ const target = process.env.KILO_REMOTE_CONTROLLER_TARGET ?? defaultTarget()
 const config = targetConfig(target)
 const packageDirectory = path.dirname(import.meta.dir)
 const repoDirectory = path.resolve(packageDirectory, "../..")
+const packageJsonPath = path.join(packageDirectory, "package.json")
+const packageJson = await Bun.file(packageJsonPath).json()
+const version = process.env.KILO_VERSION ?? packageJson.version
+
+if (packageJson.version !== version) {
+  packageJson.version = version
+  await Bun.write(packageJsonPath, JSON.stringify(packageJson, null, 2) + "\n")
+}
+
 const source = path.join(
   repoDirectory,
   "packages",
@@ -23,9 +32,13 @@ const source = path.join(
   config.binary,
 )
 const destination = path.join(packageDirectory, "bin", config.binary)
+const iconSource = path.join(repoDirectory, "packages", "kilo-vscode", "assets", "icons", "logo-outline-black.png")
+const iconDestination = path.join(packageDirectory, "assets", "logo-outline-black.png")
 
 await rm(path.join(packageDirectory, "bin"), { recursive: true, force: true })
 await mkdir(path.dirname(destination), { recursive: true })
+await mkdir(path.dirname(iconDestination), { recursive: true })
+await cp(iconSource, iconDestination)
 
 try {
   await cp(source, destination)

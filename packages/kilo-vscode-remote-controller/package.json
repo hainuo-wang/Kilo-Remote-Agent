@@ -3,15 +3,25 @@
   "name": "kilo-remote-agent-controller",
   "displayName": "Kilo Remote Agent Controller",
   "description": "Local model, credential, session, and transport controller for Kilo Remote Agent.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "hainuo-wang",
+  "icon": "assets/logo-outline-black.png",
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "remote ssh",
+    "remote agent",
+    "local controller",
+    "offline server",
+    "network restricted"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/hainuo-wang/Kilo-Remote-Agent.git",
     "directory": "packages/kilo-vscode-remote-controller"
   },
   "license": "MIT",
-  "private": true,
   "engines": {
     "vscode": "^1.105.1"
   },

@@ -144,9 +144,46 @@ the security policy of a relay or bastion host.
 Kilo Remote Agent requires a VS Code Remote SSH connection that already works.
 Install the extensions into the correct extension hosts:
 
+### Online installation from the VS Code Marketplace
+
+Install the **Kilo Remote Agent for Remote SSH** Extension Pack. It installs
+the three runtime extensions while preserving their separate local and remote
+placement:
+
+```text
+Marketplace Extension Pack
+├── Local Controller
+├── Remote SSH Main Agent
+└── Remote SSH Worker
+```
+
+The Extension Pack is the recommended online installation path. The local VS
+Code client needs Marketplace access. VS Code installs each component into its
+declared UI or workspace extension host over the existing Remote SSH session;
+the remote server does not need access to the model provider.
+
+### Offline or network-restricted installation
+
+For a remote server with no Internet access, download the single-file
+Installer VSIX from the GitHub Release:
+
+```text
+kilo-remote-agent-installer-<version>.vsix
+```
+
+Install this same file twice:
+
+1. In a local VS Code window, install it and run `Kilo Remote Agent: Install Components` to install the local Controller.
+2. In the Remote SSH window, upload the same file to the remote workspace, install it there, and run the same command to install the remote Main Agent and Worker.
+
+The Installer VSIX contains the platform-specific component VSIX files and
+does not require Marketplace access. It is an installation bootstrapper only;
+the three runtime extensions remain independent.
+
 ### Windows local + Linux remote
 
-Download these VSIX files from the GitHub Release:
+If you are installing the runtime packages manually, download these VSIX files
+from the GitHub Release:
 
 ```text
 kilo-remote-agent-controller-win32-x64.vsix
@@ -321,12 +358,14 @@ Install dependencies:
 bun install
 ```
 
-Build the platform-specific packages from their directories:
+Build the runtime components and distribution packages from these directories:
 
 ```text
 packages/kilo-vscode
 packages/kilo-vscode-remote-controller
 packages/kilo-vscode-remote-worker
+packages/kilo-vscode-remote-installer
+packages/kilo-vscode-remote-pack
 ```
 
 The Controller and Worker packages include a matching Kilo CLI/runtime when
@@ -339,6 +378,12 @@ Pushing a `v*` tag to the `hainuo-wang/Kilo-Remote-Agent` repository triggers
 the GitHub Actions workflow that builds and uploads the platform-specific
 VSIX packages to a GitHub Release. The workflow does not publish to the VS
 Code Marketplace and does not run the official Kilo Code release workflow.
+
+The Marketplace workflow is intentionally manual and requires a
+`VSCE_PAT` GitHub Actions secret belonging to the `hainuo-wang` VS Code
+Marketplace publisher. Run it with the release tag after reviewing the
+generated runtime VSIX files and Extension Pack. The large offline Installer
+VSIX is uploaded to GitHub Releases but is not published to the Marketplace.
 
 ## License
 
@@ -489,9 +534,43 @@ Controller；本机 backend 再通过版本化 RPC bridge 调用 Remote Worker�
 前提是 VS Code Remote SSH 本身已经可以正常连接。安装时要注意：
 Controller 安装在本机，主扩展和 Worker 安装在 Remote SSH 远程扩展主机。
 
+### 在线使用 VS Code 插件市场安装
+
+在线环境推荐安装 **Kilo Remote Agent for Remote SSH** Extension Pack。
+它会安装三个运行时扩展，同时保留本机/远程的正确运行位置：
+
+```text
+Marketplace Extension Pack
+├── 本机 Controller
+├── Remote SSH 主扩展
+└── Remote SSH Worker
+```
+
+本机 VS Code 需要能够访问插件市场。VS Code 会通过已经建立的 Remote SSH
+会话，根据每个组件声明的 UI/workspace 宿主位置完成安装；远程服务器不需要
+访问模型 API。
+
+### 离线或网络受限环境安装
+
+如果远程服务器没有互联网，请从 GitHub Release 下载单文件安装器：
+
+```text
+kilo-remote-agent-installer-<version>.vsix
+```
+
+同一个文件需要安装两次：
+
+1. 在本机 VS Code 窗口安装它，然后执行
+   `Kilo Remote Agent: Install Components`，安装本机 Controller。
+2. 在 Remote SSH 窗口把同一个文件上传到远程工作区，在该窗口安装它，
+   再执行相同命令，安装远程主扩展和 Worker。
+
+Installer VSIX 内含对应平台的组件 VSIX，不需要远程服务器访问插件市场。
+它只是安装引导程序，实际运行时仍然是三个独立扩展。
+
 ### Windows 本机 + Linux 远程服务器
 
-从 GitHub Release 下载以下 VSIX：
+如果需要手动安装运行时组件，从 GitHub Release 下载以下 VSIX：
 
 ```text
 kilo-remote-agent-controller-win32-x64.vsix
@@ -658,12 +737,14 @@ LSP、诊断、MCP placement 和更多依赖工作区位置的工具仍需要后
 bun install
 ```
 
-三个扩展的构建目录是：
+运行时组件和分发包的构建目录是：
 
 ```text
 packages/kilo-vscode
 packages/kilo-vscode-remote-controller
 packages/kilo-vscode-remote-worker
+packages/kilo-vscode-remote-installer
+packages/kilo-vscode-remote-pack
 ```
 
 在对应的 OpenCode artifact 构建完成后打包，Controller 和 Worker 会带上
@@ -674,6 +755,12 @@ packages/kilo-vscode-remote-worker
 向 `hainuo-wang/Kilo-Remote-Agent` 推送 `v*` 标签会触发 GitHub Actions，
 构建并上传平台对应的 VSIX 到 GitHub Release。该流程不会发布到 VS Code
 Marketplace，也不会触发官方 Kilo Code 的发布流程。
+
+Marketplace 发布流程是手动触发的，需要在 GitHub Actions 中配置属于
+`hainuo-wang` VS Code Marketplace publisher 的 `VSCE_PAT` Secret。审查
+生成的运行时 VSIX 和 Extension Pack 后，再用对应 release tag 手动运行
+该 workflow。体积较大的离线 Installer VSIX 只上传 GitHub Release，不发布
+到 Marketplace。
 
 ## License
 

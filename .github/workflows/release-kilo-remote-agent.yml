@@ -1,3 +1,4 @@
+# kilocode_change start
 name: release-kilo-remote-agent
 
 on:
@@ -68,19 +69,38 @@ jobs:
       - name: Build local Windows controller extension
         working-directory: packages/kilo-vscode-remote-controller
         env:
+          # kilocode_change
+          KILO_VERSION: ${{ steps.version.outputs.value }}
           KILO_REMOTE_CONTROLLER_TARGET: win32-x64
         run: bun run package
 
       - name: Build local Linux controller extension
         working-directory: packages/kilo-vscode-remote-controller
         env:
+          # kilocode_change
+          KILO_VERSION: ${{ steps.version.outputs.value }}
           KILO_REMOTE_CONTROLLER_TARGET: linux-x64
         run: bun run package
 
       - name: Build remote Linux worker extension
         working-directory: packages/kilo-vscode-remote-worker
         env:
+          # kilocode_change
+          KILO_VERSION: ${{ steps.version.outputs.value }}
           KILO_REMOTE_WORKER_TARGET: linux-x64
+        run: bun run package
+
+      # kilocode_change start
+      - name: Build offline installer VSIX
+        working-directory: packages/kilo-vscode-remote-installer
+        env:
+          KILO_VERSION: ${{ steps.version.outputs.value }}
+        run: bun run package
+
+      - name: Build Marketplace Extension Pack
+        working-directory: packages/kilo-vscode-remote-pack
+        env:
+          KILO_VERSION: ${{ steps.version.outputs.value }}
         run: bun run package
 
       - name: Verify extension IDs and secrets
@@ -92,12 +112,18 @@ jobs:
             packages/kilo-vscode/out/kilo-remote-agent-linux-x64.vsix \
             packages/kilo-vscode-remote-controller/out/kilo-remote-agent-controller-win32-x64.vsix \
             packages/kilo-vscode-remote-controller/out/kilo-remote-agent-controller-linux-x64.vsix \
-            packages/kilo-vscode-remote-worker/out/kilo-remote-agent-worker-linux-x64.vsix
+            packages/kilo-vscode-remote-worker/out/kilo-remote-agent-worker-linux-x64.vsix \
+            packages/kilo-vscode-remote-installer/out/kilo-remote-agent-installer-${{ steps.version.outputs.value }}.vsix \
+            packages/kilo-vscode-remote-pack/out/kilo-remote-agent-pack-${{ steps.version.outputs.value }}.vsix
           do
             test -f "$package"
             unzip -p "$package" extension/package.json \
               | grep -E '"(name|publisher)": "(kilo-remote-agent|hainuo-wang)' >/dev/null
           done
+          unzip -l "packages/kilo-vscode-remote-installer/out/kilo-remote-agent-installer-${{ steps.version.outputs.value }}.vsix" \
+            | grep -E 'payload/kilo-remote-agent-(controller-win32-x64|controller-linux-x64|linux-x64|worker-linux-x64)\\.vsix'
+          unzip -p "packages/kilo-vscode-remote-pack/out/kilo-remote-agent-pack-${{ steps.version.outputs.value }}.vsix" \
+            extension/package.json | grep -E '"extensionPack":'
 
       - name: Create GitHub release and upload VSIX files
         env:
@@ -109,4 +135,8 @@ jobs:
             packages/kilo-vscode/out/kilo-remote-agent-linux-x64.vsix \
             packages/kilo-vscode-remote-controller/out/kilo-remote-agent-controller-win32-x64.vsix \
             packages/kilo-vscode-remote-controller/out/kilo-remote-agent-controller-linux-x64.vsix \
-            packages/kilo-vscode-remote-worker/out/kilo-remote-agent-worker-linux-x64.vsix
+            packages/kilo-vscode-remote-worker/out/kilo-remote-agent-worker-linux-x64.vsix \
+            packages/kilo-vscode-remote-installer/out/kilo-remote-agent-installer-${{ steps.version.outputs.value }}.vsix \
+            packages/kilo-vscode-remote-pack/out/kilo-remote-agent-pack-${{ steps.version.outputs.value }}.vsix
+
+# kilocode_change end

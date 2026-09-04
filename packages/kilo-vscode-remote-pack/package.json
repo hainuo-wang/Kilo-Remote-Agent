@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "kilo-remote-agent-pack",
+  "displayName": "Kilo Remote Agent for Remote SSH",
+  "description": "Install the local Controller and Remote SSH agent components for offline or network-restricted Linux servers.",
+  "version": "0.2.0",
+  "publisher": "hainuo-wang",
+  "icon": "assets/logo-outline-black.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hainuo-wang/Kilo-Remote-Agent.git",
+    "directory": "packages/kilo-vscode-remote-pack"
+  },
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.105.1"
+  },
+  "categories": [
+    "Extension Packs"
+  ],
+  "keywords": [
+    "remote ssh",
+    "vscode remote ssh",
+    "remote agent",
+    "offline server",
+    "network restricted",
+    "no internet",
+    "air gapped",
+    "coding agent",
+    "local llm",
+    "remote development",
+    "linux server"
+  ],
+  "extensionPack": [
+    "hainuo-wang.kilo-remote-agent",
+    "hainuo-wang.kilo-remote-agent-controller",
+    "hainuo-wang.kilo-remote-agent-worker"
+  ],
+  "scripts": {
+    "package": "bun script/package.ts"
+  },
+  "devDependencies": {
+    "@vscode/vsce": "^3.7.1"
+  }
+}

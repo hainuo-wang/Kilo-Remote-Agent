@@ -1,0 +1,113 @@
+# kilocode_change - new file
+name: publish-kilo-remote-agent-marketplace
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Git tag whose GitHub Release assets should be published
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-kilo-remote-agent-marketplace-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.repository == 'hainuo-wang/Kilo-Remote-Agent'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+          fetch-depth: 1
+
+      - name: Setup Bun
+        uses: ./.github/actions/setup-bun
+
+      - name: Download Marketplace VSIX assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version="${{ inputs.tag }}"
+          version="${version#v}"
+          mkdir -p "$RUNNER_TEMP/kilo-remote-agent-marketplace"
+          gh release download "${{ inputs.tag }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --dir "$RUNNER_TEMP/kilo-remote-agent-marketplace" \
+            --pattern 'kilo-remote-agent-linux-x64.vsix' \
+            --pattern 'kilo-remote-agent-controller-win32-x64.vsix' \
+            --pattern 'kilo-remote-agent-controller-linux-x64.vsix' \
+            --pattern 'kilo-remote-agent-worker-linux-x64.vsix' \
+            --pattern "kilo-remote-agent-pack-${version}.vsix"
+
+      - name: Verify Marketplace VSIX manifests
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${{ inputs.tag }}"
+          version="${version#v}"
+          dir="$RUNNER_TEMP/kilo-remote-agent-marketplace"
+          node <<'NODE'
+          const { execFileSync } = require("node:child_process")
+          const { readdirSync } = require("node:fs")
+          const { join } = require("node:path")
+
+          const dir = process.env.RUNNER_TEMP + "/kilo-remote-agent-marketplace"
+          const version = process.env.RELEASE_VERSION.replace(/^v/, "")
+          const expected = new Map([
+            ["kilo-remote-agent-linux-x64.vsix", "hainuo-wang.kilo-remote-agent"],
+            ["kilo-remote-agent-controller-win32-x64.vsix", "hainuo-wang.kilo-remote-agent-controller"],
+            ["kilo-remote-agent-controller-linux-x64.vsix", "hainuo-wang.kilo-remote-agent-controller"],
+            ["kilo-remote-agent-worker-linux-x64.vsix", "hainuo-wang.kilo-remote-agent-worker"],
+            [`kilo-remote-agent-pack-${version}.vsix`, "hainuo-wang.kilo-remote-agent-pack"],
+          ])
+
+          for (const [file, id] of expected) {
+            if (!readdirSync(dir).includes(file)) throw new Error(`Missing release asset: ${file}`)
+            const manifest = execFileSync("unzip", ["-p", join(dir, file), "extension/package.json"], { encoding: "utf8" })
+            const packageJson = JSON.parse(manifest)
+            if (`${packageJson.publisher}.${packageJson.name}` !== id) {
+              throw new Error(`Unexpected extension ID in ${file}`)
+            }
+            if (packageJson.version !== version) throw new Error(`Unexpected version in ${file}`)
+          }
+          NODE
+        env:
+          RELEASE_VERSION: ${{ inputs.tag }}
+
+      - name: Validate Marketplace token
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: test -n "$VSCE_PAT"
+
+      - name: Publish runtime extensions and Extension Pack
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/kilo-remote-agent-marketplace"
+          for package in \
+            "$dir/kilo-remote-agent-linux-x64.vsix" \
+            "$dir/kilo-remote-agent-controller-win32-x64.vsix" \
+            "$dir/kilo-remote-agent-controller-linux-x64.vsix" \
+            "$dir/kilo-remote-agent-worker-linux-x64.vsix"
+          do
+            test -f "$package"
+            bun packages/kilo-vscode-remote-pack/node_modules/.bin/vsce publish \
+              --skip-duplicate \
+              --packagePath "$package"
+          done
+          version="${{ inputs.tag }}"
+          version="${version#v}"
+          pack="$dir/kilo-remote-agent-pack-${version}.vsix"
+          test -f "$pack"
+          bun packages/kilo-vscode-remote-pack/node_modules/.bin/vsce publish \
+            --skip-duplicate \
+            --packagePath "$pack"

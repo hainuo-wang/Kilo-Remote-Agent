@@ -47,6 +47,7 @@ const active = new Set([
   "prepare-jetbrains-release.yml",
   "publish-jetbrains-bundled.yml",
   "publish-jetbrains.yml",
+  "publish-kilo-remote-agent-marketplace.yml",
   "publish.yml",
   "release-kilo-remote-agent.yml",
   "smoke-test.yml",
