@@ -1,68 +1,48 @@
 # Kilo Remote Agent Controller
 
-This package is the local-side companion for the Cursor-like Remote SSH
-prototype. It runs in the local VS Code UI extension host while the main Kilo
-extension runs in the workspace host. In a normal local window, VS Code has no
-remote extension host, so the workspace extension still executes locally.
+## 中文文档
 
-When `kilo-code.new.experimental.cursorLikeRemote` is enabled in a Remote SSH
-window, this extension owns:
+这是 Kilo Remote Agent 的本机 Controller，运行在本机 VS Code UI Extension
+Host。它负责本机 Agent runtime、模型 Provider、会话状态、本机 `kilo serve`
+以及与 Remote SSH Workspace Host 的传输代理。
 
-- the local `kilo serve` process;
-- the local DuckCoding provider configuration and SecretStorage lookup;
-- the authenticated localhost WebSocket bridge used by remote tools; and
-- the command-RPC HTTP/SSE proxy used by the remote main extension.
+Controller 只在本机读取和保存模型凭据。远程 Extension Host 只接收普通的
+Agent 请求、工具结果和流式终端输出，不接收 API Key。
 
-The remote extension host never receives the DuckCoding API key. It only sees
-ordinary backend responses and streamed tool output.
+本项目保留现有 Kilo HTTP/SSE backend，并通过 VS Code command transport 将
+Remote Main Agent 的请求转发给本机 Controller。远程 PTY 使用 Remote Worker
+的进程实现，不能依赖 `vscode.window.createTerminal()` 捕获输出。
 
-Credential-bearing responses are projected before they cross the command route.
-Remote config/auth writes containing literal credential values are rejected;
-configure DuckCoding in the local controller with `Kilo: Configure Local
-DuckCoding API Key`. A custom provider must already be saved in the local
-controller before the remote host can discover its models. Existing `mioffice.*`
-settings and the `mioffice.apiKey` secret are read as migration fallbacks.
-
-The controller uses the DuckCoding model `gpt-5.6-sol` and OpenAI Responses API
-by default. The default API endpoint is `https://api.duckcoding.ai/v1`.
-Configure `kilo-code.new.experimental.duckcoding.baseURL` only when using a
-different compatible endpoint. Set `kilo-code.new.experimental.duckcoding.api`
-to `chat` only for an endpoint that implements OpenAI-compatible Chat
-Completions.
-
-If the local machine reaches DuckCoding through a proxy, set
-`kilo-code.remoteController.proxy`. The proxy is added only to the local
-`kilo serve` environment and is never included in Remote Worker RPC messages or
-remote process environments.
-
-The smoke command is available from the Command Palette:
+可用的开发测试命令：
 
 ```text
 Kilo: Run Remote Worker Smoke Test
 ```
 
-The command performs remote read/write/list/grep and `process.run` requests.
-Output is returned through the reverse VS Code command route and checked
-against the byte counts reported by the remote worker. It does not use
-`vscode.window.createTerminal()` for output capture.
+如果没有使用打包内置的 CLI，可通过 `kilo-code.remoteController.cliPath`
+指定本机 CLI 路径。该设置只影响本机 Controller。
 
-The prototype deliberately keeps Kilo's existing HTTP/SSE backend and SDK
-unchanged. The remote main extension proxies those HTTP/SSE requests through
-VS Code commands to the local controller; the local backend then talks to the
-remote worker through the same controller's localhost bridge. Agent Manager
-embedded terminal tabs use a separate local WebSocket endpoint backed by the
-same Remote Worker PTY stream, so terminal output does not depend on
+## English Documentation
+
+This package is the local Controller for Kilo Remote Agent. It runs in the
+local VS Code UI extension host and owns the local Agent runtime, model
+Provider, session state, local `kilo serve`, and transport proxy to the Remote
+SSH workspace host.
+
+The Controller reads and stores model credentials only on the local machine.
+The remote extension host receives ordinary Agent requests, tool results, and
+streamed terminal output, never the API key.
+
+The prototype preserves Kilo’s existing HTTP/SSE backend and forwards Remote
+Main Agent requests through VS Code command transport. Remote PTY output comes
+from the Remote Worker process implementation rather than
 `vscode.window.createTerminal()` capture.
 
-To create a local Windows companion VSIX, build the
-`@kilocode/cli-windows-x64` opencode artifact and run:
+Use `Kilo: Run Remote Worker Smoke Test` for development verification. If the
+bundled CLI is not suitable, set `kilo-code.remoteController.cliPath` to a
+local CLI path; the setting affects only the local Controller.
 
-```bash
-KILO_REMOTE_CONTROLLER_TARGET=win32-x64 bun run package
-```
+## License
 
-The package copies the matching CLI and runtime resources into its own
-`bin/` directory, so it does not depend on the main extension being installed
-in the local extension host. If the bundled CLI cannot be used during
-development, configure `kilo-code.remoteController.cliPath` to an external
-local Kilo CLI path.
+MIT. This project is based on Kilo Code and OpenCode and retains their
+respective licenses and attribution.
